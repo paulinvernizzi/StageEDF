@@ -1,0 +1,94 @@
+load "msh3"
+load "medit"
+include "getARGV.idp";
+exec("rm -r Resultats3");
+exec("mkdir Resultats3" );
+
+int DNptL = getARGV("-DNptL",62);
+int ENptL = getARGV("-ENptL",63);
+int Niter = getARGV("-Niter",2);
+int attente = 0;
+int NmNev = getARGV("-NmNev",0);
+int Plot = 0;
+
+real Rext = 2;
+real sigma = 0;
+
+int NptL= 1;
+real etape = 0;
+for (int i = 0; i < Niter; i++){
+	etape = i/(Niter - 1.);
+	cout << "etape = " << etape << endl;
+	NptL = DNptL + etape*(ENptL - DNptL);
+	cout << "NptL = " << NptL << endl;
+	if (NptL != 32){
+	exec("FreeFem++ /home/c31182/Helmh/TEST.edp -NptL "+NptL+" -ecrire "+1+" -NmNev "+NmNev);
+	exec("mpirun -n 1 FreeFem++-mpi /home/c31182/Helmh/TEST_SLEPC.edp -wg -NptL "+NptL+" -ecrire "+1+" -NmNev "+NmNev);}
+}
+
+NptL= 1;
+etape = 0;
+for (int i = 0; i < Niter; i++){
+	etape = i/(Niter - 1.);
+	NptL = DNptL + etape*(ENptL - DNptL);
+
+	if (NptL != 32){
+	border Sigmaext(t=0,2*pi){x=Rext*cos(t);y=Rext*sin(t);label=1;};
+	int pext = NptL;
+	mesh Mh = buildmesh(Sigmaext(pext));
+	if (Plot == 1){
+	plot(Mh,wait = attente);}
+	fespace Xh(Mh,P2);
+	Xh<complex> sol;
+
+	varf Cl(u,v) = int2d(Mh)(dx(u)*dx(v)+dy(u)*dy(v))
+			- int2d(Mh)(u*v)
+			+ int1d(Mh,1)((dx(u)*(N.y) - dy(u)*(N.x))*(dx(v)*(N.y) - dy(v)*(N.x)));
+	matrix<complex> A = Cl(Xh,Xh);
+	set(A,solver=sparsesolver);
+
+	real x0=0, y0 = 2.5;
+	Xh<complex> UI = 0;
+	Xh<complex> f = 0;
+	func XmX0 = sqrt((x-x0)^2+(y-y0)^2);
+	func uincpoint = jn(0,XmX0)+1.i*yn(0,XmX0);
+	func XmX0scaln = ((x-x0)*cos(atan2(y,x))+(y-y0)*sin(atan2(y,x)))/XmX0;
+	func duincpoint = -XmX0scaln*(jn(1,XmX0)+1.i*yn(1,XmX0));
+	UI=uincpoint;
+	f = duincpoint;
+	varf impclass(u,v)=int1d(Mh,1)((f - 1.i*UI)*v);
+	complex[int] F = impclass(0,Xh);
+	complex[int] S = A^-1*F;
+	sol[] = S;
+	Xh<complex> solSLEPC;
+	Xh<complex> solEIGEN;
+	//real[int] eigEIGEN(Nev);
+	//real[int] eigSLEPC(Nev);
+	
+	{ifstream SolEIG("Resultats3/SolEig_NptL"+ NptL+".dat");
+	    SolEIG>>solEIGEN[];}
+	{ifstream SolSLEPC("Resultats3/SolSLEPC_NptL"+ NptL+".dat");
+	    SolSLEPC>>solSLEPC[];}
+
+	//{ifstream EigEIG("Resultats3/SolEig_NptL"+ NptL+".dat");
+	  //  EigEIG>>eigEIGEN[];}
+	//{ifstream EigSLEPC("Resultats3/SolSLEPC_NptL"+ NptL+".dat");
+	  //  EigSLEPC>>eigSLEPC[];}
+	
+
+	complex normL2 = sqrt(int2d(Mh)(sol*conj(sol)));
+	complex normH1 = sqrt(int2d(Mh)(sol*conj(sol) + dx(sol)*conj(dx(sol)) + dy(sol)*conj(dy(sol)) ));
+	complex erreurL2SLEPC = sqrt(int2d(Mh)((sol - solSLEPC)*conj(sol - solSLEPC)));
+	complex erreurL2EIGEN = sqrt(int2d(Mh)((sol - solEIGEN)*conj(sol - solEIGEN)));
+	complex erreurH1SLEPC = sqrt(int2d(Mh)((sol - solSLEPC)*conj(sol - solSLEPC) + (dx(sol) - dx(solSLEPC))*(conj(dx(sol)) - conj(dx(solSLEPC))) + (dy(sol) - dy(solSLEPC))*(conj(dy(sol)) - conj(dy(solSLEPC)))));
+	complex erreurH1EIGEN = sqrt(int2d(Mh)((sol - solEIGEN)*conj(sol - solEIGEN) + (dx(sol) - dx(solEIGEN))*(conj(dx(sol)) - conj(dx(solEIGEN))) + (dy(sol) - dy(solEIGEN))*(conj(dy(sol)) - conj(dy(solEIGEN)))));
+	
+	ofstream Erreur("Resultats3/Erreurs.dat", append);
+			Erreur.precision(15);
+			Erreur << "NptL = "<<NptL<<endl;
+			Erreur << "erreurL2SLEPC = "<<real(erreurL2SLEPC)/real(normL2)<<endl;
+			Erreur << "erreurL2EIGEN = "<<real(erreurL2EIGEN)/real(normL2)<<endl;
+			Erreur << "erreurH1SLEPC = "<<real(erreurH1SLEPC)/real(normH1)<<endl;
+			Erreur << "erreurH1EIGEN = "<<real(erreurH1EIGEN)/real(normH1)<<endl;
+			Erreur << endl;
+}}

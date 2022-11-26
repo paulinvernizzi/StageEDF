@@ -1,0 +1,132 @@
+include "getARGV.idp";
+
+// Delete the old results and create new directories
+exec("rm -r Resultats");
+exec("rm -r Maillages");
+exec("rm -r Erreurs");
+exec("mkdir Resultats Erreurs Maillages" );
+
+// --------------------------------------------------------------
+// Options
+// -------------------------------------------------------------
+
+// Onde incidente // Attention, si on veut changer l'onde incidente, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
+int typeuinc = getARGV("-uinc",1) ; // 0 = onde plane, 1 = point source
+
+// Plot
+int plotmaill = 0; // Plot les maillages ? 0 = Non, 1 = Oui
+int ploterror = 0; // Plot l'erreur ? 0 = Non, 1 = Oui
+int plotsol = 0; // Plot les solutions ? 0 = Non, 1 = Oui
+
+// Forme couche
+int typecouche = getARGV("-typecouche",0) ; // 0 = bosse gauche, 1 = bosse haut, 2 = bosse haut gauche, 3 = 5 bosses symètrie axe ordonnée, 4 = 5 bosses symétrie axe abscisse
+
+// Ordre
+int ordre = getARGV("-ordre",1); // Ordre de précision en delta
+
+// Reglage points étudiés
+int debutNptL = getARGV("-debutNptL", 50);
+int finNptL = getARGV("-finNptL", 70);
+int Niter = getARGV("-Niter", 20);
+
+// --------------------------------------------------------------
+// Paramétrage 
+// --------------------------------------------------------------
+
+// Definition de variables physiques
+real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
+real repsp =  getARGV("-repsp",1.), iepsp = getARGV("-iepsp",0.); // epsilon plus
+real repsc = getARGV("-re",3.), iepsc = getARGV("-ie",0.); // epsilon couche
+real rmum =  getARGV("-rmum",1.), imum = getARGV("-imum",0.); // mu moins
+real rmup =  getARGV("-rmup",1.), imup = getARGV("-imup",0.); // mu plus
+real rmuc = getARGV("-rm",10.), imuc = getARGV("-im",1.); // mu couche
+
+// Parametres geometrie et nb d'onde
+real k = getARGV("-k",1.); // nombre d'onde
+real lambdap = 2*pi/(abs(k)*sqrt(repsp*rmup));
+real lambdac = 2*pi/(abs(k)*sqrt(repsc*rmuc));
+real lambdam = 2*pi/(abs(k)*sqrt(repsm*rmum));
+real lambda = 2*pi/abs(k);
+real Rext = 2 * lambda; // Rayon du cercle exterieur
+real unit = lambda;  // Unite de mesure
+real rpet = unit; // Rayon du cercle intérieur
+real rmoy = rpet + 0.5*lambda; //Rayon limite pour l'erreur
+real rint = rpet - 0.25*lambdam; //Rayon limite pour l'erreur
+real delta = getARGV("-delta",0.05);
+
+real NptLa = 1;
+real NptLp = 1;
+real NptL = 1;
+real etape = -1;
+for (int i = 0; i <= Niter; i++){
+	etape = etape + 1;
+	NptL = debutNptL + (etape/Niter)*(finNptL-debutNptL);
+	// Calcul des solutions
+	if (ordre == 1){
+		exec("FreeFem++ /home/c31182/Helmh/Helmh_asymptotic.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL+ " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);}
+	if (ordre == 2){
+		exec("FreeFem++ /home/c31182/Helmh/Helmh_asymptotic_ordre2.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);}}
+
+etape = -1;
+
+for (int i = 0; i < Niter; i++){
+	etape = etape + 1;
+	NptLa = debutNptL + (etape/Niter)*(finNptL-debutNptL);
+	NptLp = debutNptL + ((etape + 1)/Niter)*(finNptL-debutNptL);
+
+	// Recupération des maillages et créations des espaces éléments finis associés
+	mesh ShA1a = readmesh("Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLa+".mesh");
+	mesh ShA1p = readmesh("Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLp+".mesh");
+
+	fespace XhA1a(ShA1a,P2);
+	fespace XhA1p(ShA1p,P2);
+	
+	// Construction espace elements finis pour fonction regions
+	fespace Ph1(ShA1a,P0);
+	Ph1 reg1 = region;
+	int iregplus = reg1(Rext - 0.000001 , 0);
+
+	// Plot pour vérification
+	if (plotmaill == 1){
+		plot(ShA1a, wait= 1,cmm = "ShA1a");
+		plot(ShA1p, wait= 1,cmm = "ShA1p");
+	}
+	
+	// Lecture des solutions
+	XhA1a<complex> solA1a;
+	XhA1p<complex> solA1p;
+
+
+	{ifstream SolA1a("Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLa+".dat");
+	    SolA1a>>solA1a[];}
+	
+	{ifstream SolA1p("Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLp+".dat");
+	    SolA1p>>solA1p[];}
+
+	// Calcul des erreurs
+	complex errorH1Plus = sqrt( int2d(ShA1p)( (region == iregplus)*( (solA1a - solA1p)*conj(solA1a - solA1p) + (dx(solA1a) - dx(solA1p))*(conj(dx(solA1a)) - conj(dx(solA1p))) + (dy(solA1a) - dy(solA1p))*(conj(dy(solA1a)) - conj(dy(solA1p))) )));
+	complex errorPlus = sqrt( int2d(ShA1p)( (region == iregplus)*(solA1a - solA1p)*conj(solA1a - solA1p) ));
+	complex normPlus = sqrt( int2d(ShA1p)( (region == iregplus)*solA1p*conj(solA1p)));
+	complex normH1Plus = sqrt( int2d(ShA1p)( (region == iregplus)*( solA1p*conj(solA1p) + dx(solA1p)*conj(dx(solA1p)) + dy(solA1p)*conj(dy(solA1p)) ) ) );
+
+	// Plot pour vérification
+	if (plotsol == 1){
+		XhA1p uplot1a;
+		XhA1p uplot1p;
+		XhA1p err1;
+		uplot1a = real(solA1a);
+		uplot1p = real(solA1p);
+		err1 = abs(uplot1a - uplot1p);
+		plot(err1,wait = 1,value = 1, fill = 1);
+	}
+	
+	// Ecriture des erreurs
+	{ofstream Erreur("Erreurs/Erreur.dat",append);
+		Erreur << "NptLa = " << NptLa << endl;
+		Erreur << "NptLp = " << NptLp << endl;
+		Erreur << "Erreur Plus = " << real(errorPlus) << endl;
+		Erreur << "Erreur H1Plus = " << real(errorH1Plus) << endl;
+		Erreur << "Erreur Relative Plus = " << real(errorPlus)/real(normPlus) << endl;
+		Erreur << "Erreur Relative H1Plus = " << real(errorH1Plus)/real(normH1Plus) << endl;
+		Erreur << endl;}
+}

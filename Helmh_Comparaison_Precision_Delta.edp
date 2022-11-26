@@ -1,0 +1,158 @@
+include "getARGV.idp";
+
+// Delete the old results and create new directories
+exec("rm -r Resultats");
+exec("rm -r Maillages");
+exec("rm -r Erreurs");
+exec("mkdir Resultats Erreurs Maillages" );
+
+// --------------------------------------------------------------
+// Options
+// -------------------------------------------------------------
+
+// Onde incidente // Attention, si on veut changer l'onde incidente, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
+int typeuinc = getARGV("-uinc",1) ; // 0 = onde plane, 1 = point source
+
+// Plot
+int plotmaill = 0; // Plot les maillages ? 0 = Non, 1 = Oui
+int ploterror = 0; // Plot l'erreur ? 0 = Non, 1 = Oui
+int plotsol = 0; // Plot les solutions ? 0 = Non, 1 = Oui
+
+// Forme couche
+int typecouche = getARGV("-typecouche",0) ; // 0 = bosse gauche, 1 = bosse haut, 2 = bosse haut gauche, 3 = 5 bosses symètrie axe ordonnée, 4 = 5 bosses symétrie axe abscisse
+
+// Reglage points étudiés
+int debutNptL = getARGV("-debutNptL", 90);
+int finNptL = getARGV("-finNptL", 120);
+int Niter = getARGV("-Niter", 3);
+
+// --------------------------------------------------------------
+// Paramétrage 
+// --------------------------------------------------------------
+
+
+// definition de variables physiques // Attention, si on veut changer les données sur moins ou plus, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
+real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
+real repsp =  getARGV("-repsp",1.), iepsp = getARGV("-iepsp",0.); // epsilon plus
+real repsc = getARGV("-re",3.), iepsc = getARGV("-ie",0.); // epsilon couche
+real rmum =  getARGV("-rmum",1.), imum = getARGV("-imum",0.); // mu moins
+real rmup =  getARGV("-rmup",1.), imup = getARGV("-imup",0.); // mu plus
+real rmuc = getARGV("-rm",10.), imuc = getARGV("-im",0.); // mu couche
+
+//parametres geometrie et nb d'onde
+real k = getARGV("-k",1.); // nombre d'onde
+real lambdap = 2*pi/(abs(k)*sqrt(repsp*rmup));
+real lambdac = 2*pi/(abs(k)*sqrt(repsc*rmuc));
+real lambdam = 2*pi/(abs(k)*sqrt(repsm*rmum));
+real lambda = 2*pi/abs(k);
+real Rext = 2 * lambda; // Rayon du cercle exterieur
+real unit = lambda;  // Unite de mesure
+real rpet = unit; // Rayon du cercle intérieur
+real rmoy = rpet + 0.5*lambda; //Rayon limite pour l'erreur
+real rint = rpet - 0.25*lambdam; //Rayon limite pour l'erreur
+real delta = getARGV("-delta", 0.03);
+
+int NptLa = 1.;
+int NptLp = 1.;
+int NptL = 1.;
+real etape = -1.;
+for (int i = 0; i <= Niter; i++){
+	etape = etape + 1;
+	NptL = debutNptL + (etape/Niter)*(finNptL-debutNptL);
+	// Calcul des solutions
+	//exec("export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/c31182/FreeFem-sources-4.11/plugin/mpi");
+	exec("mpiexec -n 4 FreeFem++-mpi /home/c31182/Helmh/Helmh_delta.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);
+}
+
+etape = -1;
+for (int i = 0; i < Niter; i++){ 
+	etape = etape + 1;
+	NptLa = debutNptL + (etape/Niter)*(finNptL-debutNptL);
+	NptLp = debutNptL + ((etape + 1)/Niter)*(finNptL-debutNptL);
+
+	// Recupération des maillages et créations des espaces éléments finis associés
+	mesh ShDa = readmesh("Maillages/Delta_delta_" +delta+"_NptL"+ NptLa+".mesh");
+	mesh ShDp = readmesh("Maillages/Delta_delta_" +delta+"_NptL"+ NptLp+".mesh");
+	
+	fespace XhDa(ShDa,P2);
+	fespace XhDp(ShDp,P2);
+
+	// Construction espace elements finis pour fonction regions
+	fespace PhDp(ShDp,P0);
+	PhDp regDp = region;
+	int iregmoinsp = regDp(0,0);
+	int iregplusp = regDp(Rext - 0.000001 , 0);
+	int iregintp = regDp(rint + 0.000001, 0);
+
+	// Plot pour vérification
+	if (plotmaill == 1){
+		plot(ShDa, wait=1,cmm = "ShDa");
+		plot(ShDp, wait=1,cmm = "ShDp");
+	}
+	
+	// Lecture des solutions
+	XhDa<complex> solDa;
+	XhDp<complex> solDp;
+	matrix<complex> MMp;
+	matrix<complex> MMdp;
+
+	{ifstream Matrp("Resultats/Matrixp_delta_" +delta+"_NptL"+ NptLp+".dat");
+	    Matrp>>MMp;}
+
+	{ifstream Matrdp("Resultats/Matrixdp_delta_" +delta+"_NptL"+ NptLp+".dat");
+	    Matrdp>>MMdp;}
+
+	{ifstream SolDa("Resultats/Delta_delta_" +delta+"_NptL"+ NptLa+".dat");
+	    SolDa>>solDa[];}
+
+	{ifstream SolDp("Resultats/Delta_delta_" +delta+"_NptL"+ NptLp+".dat");
+	    SolDp>>solDp[];}
+	
+	// Calcul des erreurs
+	matrix IP = interpolate(XhDp,XhDa);
+	complex[int] MsolDp = MMp*solDp[];
+	complex normPlus = sqrt( MsolDp'*solDp[]);
+	complex[int] MsolDdp = MMdp*solDp[];
+	complex normDPlus = sqrt( MsolDdp'*solDp[]);
+	complex[int] solDaI = IP*solDa[];
+	complex[int] diff1 = solDp[] - solDaI;
+	complex[int] Mdiffp = MMp*diff1;
+	complex[int] Mdiffdp = MMdp*diff1;
+	complex errorPlus = sqrt( Mdiffp'*diff1);
+	complex errorH1Plus = sqrt( Mdiffdp'*diff1);
+	
+	// Plot pour vérification
+	if (plotsol == 1){
+		XhDa uplota;
+		XhDp uplotp;
+		XhDp uplotai;
+		XhDp<complex> SolDAI;
+		SolDAI[] = solDaI;
+		XhDp err;
+		XhDp errdx;
+		XhDp errdy;
+		uplota = real(solDa);
+		uplotp = real(solDp);
+		uplotai = real(SolDAI);
+		err = abs(real(solDp - solDa));
+		errdx = abs(real(dx(solDp) - dx(solDa)));
+		errdy = abs(real(dy(solDp) - dy(solDa)));
+		plot(uplota,wait= 1,fill =1, value = 1,cmm= "Sol A");
+		plot(uplotp,wait= 1,fill =1, value = 1, cmm= "Sol P");
+		plot(uplotai,wait = 1, fill =1, value = 1, cmm = "Sol AI");
+		plot(err,wait = 1, fill =1, value = 1,cmm = "err");
+		plot(errdx, wait = 1, fill = 1, value = 1,cmm = "errdx");
+		plot(errdy, wait = 1, fill = 1, value = 1, cmm = "errdy");
+	}
+	
+	// Ecriture des erreurs
+	{ofstream Erreur("Erreurs/Erreur.dat",append);
+		Erreur << "NptLa = " << NptLa << endl;
+		Erreur << "NptLp = " << NptLp << endl;
+		Erreur << "Erreur Plus = " << real(errorPlus) << endl;
+		Erreur << "Erreur H1Plus = " << real(errorH1Plus) << endl;
+		Erreur << "Erreur Relative Plus = " << real(errorPlus)/real(normPlus) << endl;
+		Erreur << "Erreur Relative H1Plus = " << real(errorH1Plus)/real(normDPlus) << endl;
+		Erreur << endl;
+	}
+}

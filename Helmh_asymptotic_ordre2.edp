@@ -1,0 +1,236 @@
+include "getARGV.idp";
+
+// --------------------------------------------------------------
+// Options
+// -------------------------------------------------------------
+
+// Onde incidente
+int typeuinc = getARGV("-uinc",1) ; // 0 = onde plane, 1 = point source
+
+// Photos save
+int photosave = 0 ; // 1 = on sauvegarde l'image, 0 = non
+
+// Plot
+int plotmaill = 0; // Plot les maillages ? 0 = Non, 1 = Oui
+int plotsol = 0; // Plot les solutions ? 0 = Non, 1 = Oui
+
+// Forme couche
+int typecouche = getARGV("-typecouche",0) ; // 0 = bosse gauche, 1 = bosse haut, 2 = bosse haut gauche, 3 = 5 bosses symètrie axe ordonnée, 4 = 5 bosses symétrie axe abscisse
+
+// Ecriture
+int ecrire = getARGV("-ecrire",0); // Ecrire dans un fichier la solution et sauvegarder le maillage ? 0 = Non, 1 = Oui
+
+// --------------------------------------------------------------
+// Paramétrage 
+// --------------------------------------------------------------
+
+// definition de variables physiques
+real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
+real repsp =  getARGV("-repsp",1.), iepsp = getARGV("-iepsp",0.); // epsilon plus
+real repsc = getARGV("-re",3.), iepsc = getARGV("-ie",0.); // epsilon couche
+real rmum =  getARGV("-rmum",1.), imum = getARGV("-imum",0.); // mu moins
+real rmup =  getARGV("-rmup",1.), imup = getARGV("-imup",0.); // mu plus
+real rmuc = getARGV("-rm",10.), imuc = getARGV("-im",1.); // mu couche
+
+//parametres geometrie et nb d'onde
+real k = getARGV("-k",1.); // nombre d'onde
+real lambdap = 2*pi/(abs(k)*sqrt(repsp*rmup));
+real lambdac = 2*pi/(abs(k)*sqrt(repsc*rmuc));
+real lambdam = 2*pi/(abs(k)*sqrt(repsm*rmum));
+real lambda = 2*pi/abs(k);
+real Rext = 2 * lambda; // Rayon du cercle exterieur
+real unit = lambda;  // Unite de mesure
+real rpet = unit; // Rayon du cercle intérieur
+real rmoy = rpet + 0.5*lambda; //Rayon limite pour l'erreur
+real delta = getARGV("-delta",0.005);
+real epsilon = 0.5;
+real c = 1./rpet ;
+
+// Onde incidente
+real d1=1., d2=0.; // pour l'onde plane
+real x0=0, y0 = 2.5*lambda; // pour le point source
+
+//nombre de partitions
+real NptLambda = getARGV("-NptL",50);
+int pext = 2*pi*NptLambda*Rext/lambdap;
+int pmoy = 2*pi*NptLambda*rmoy/lambdap;
+int ppet = 2*pi*NptLambda*rpet/min(lambdap,lambdam);
+
+// fonction annexe
+real a = 0;
+real b = 0;
+func real theta(real px, real py) { if (px == 0) {return ((py > 0)* pi/2. + (py< 0) * -pi/2.);} else {return atan2(py,px);} ;};
+if (typecouche == 0){ a = 1. ; b = -1. * pi ; } // bosse vers la gauche
+if (typecouche == 1){ a = 1. ; b = -1 * pi/2 ; } // bosse vers le haut
+if (typecouche == 2){ a = 1. ; b = -3 * pi/4 ; } // bosse en haut à gauche
+if (typecouche == 3){ a = 5. ; b = pi/2 ; } // 5 bosses symètrie axe ordonnée
+if (typecouche == 4){ a = - 5. ; b = 0;  } // 5 bosses symétrie axe abscisse
+if (typecouche == 5){ a = 0; b = 0;} // f constant égal à 1
+func real fcouche(real t) {return (1. + cos(a*t + b)) * 3./8. + 0.25;};
+func real fpcouche(real t){return -a*sin(a*t + b)*3./8. ;};
+
+// ---------------------------------------------------------------
+// Maillage 
+// ---------------------------------------------------------------
+
+// Construction du maillage
+border Sigmaext(t=0,2*pi){x=Rext*cos(t);y=Rext*sin(t);label=2;}; // Bord exterieur
+border limit(t=0,2*pi){x = rmoy*cos(t);y = rmoy*sin(t);label = 4;};
+border cpet(t=0,2*pi){x=rpet*cos(t);y=rpet*sin(t);label=1;}; // Bord cercle intérieur
+
+mesh Mh = buildmesh(cpet(ppet) +
+		limit(pmoy) +
+		Sigmaext(pext));
+
+// Construction espace elements finis pour fonction regions
+fespace Ph(Mh,P0);
+Ph reg = region;
+int iregmoins = reg(0,0);
+int iregplus = reg(Rext - 0.000001 , 0);
+int iregmoy = reg(rmoy - 0.000001 , 0);
+Ph is1 = (region == iregplus) + (region == iregmoy);
+Ph is2 = (region == iregmoins);
+Ph is4 = (region == iregmoy);
+
+// Construction maillage séparé
+mesh Mh1 = trunc(Mh,abs(is1));
+mesh Mh2 = trunc(Mh,abs(is2));
+mesh Mh4 = trunc(Mh,abs(is4));
+
+// Plot
+if (plotmaill == 1){
+plot(Mh, wait=1);
+plot(Mh1,wait = 1);
+plot(Mh4,wait = 1);
+plot(Mh2,wait = 1);
+}
+
+// Construction espace elements finis pour les solutions
+fespace Xh1(Mh1,P2);
+fespace Xh2(Mh2,P2);
+fespace Xh(Mh,P2);
+
+if (ecrire == 1){
+savemesh(Mh1,"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLambda+".mesh");
+savemesh(Mh2,"Maillages/Asymp_2_delta_" +delta+"_NptL"+ NptLambda+".mesh");
+}
+
+// ---------------------------------------------------------------
+// Ecriture de la formulation variationnelle asymptotique
+// ---------------------------------------------------------------
+
+varf Cl1(u1,v1) = int2d(Mh1)(1./(rmup + 1i*imup)*(dx(u1)*dx(v1)+dy(u1)*dy(v1)))
+		- int2d(Mh1)(k^2*(repsp+1i*iepsp)*(u1*v1))
+		- int1d(Mh1,2)(1i*k*u1*v1)
+		+ int1d(Mh1,1)( (1./( delta*fcouche(theta(P.x,P.y))*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) )) *u1*v1 
+				- delta*fcouche(theta(P.x,P.y))*(1./(rmup + 1.i*imup) - 1./(rmuc + 1.i*imuc))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y)))*(dx(u1)*(-N.y) + dy(u1)*(N.x))*(dx(v1)*(-N.y) + dy(v1)*(N.x)) 
+				+ fcouche(theta(P.x,P.y))*delta*k^2*(repsp + 1.i*iepsp - (repsc + 1.i*iepsc))*(1 + delta*0.5*c*fcouche(theta(P.x,P.y)))*u1*v1
+				+ (1./( delta*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) ))*delta^2*
+					( - fcouche(theta(P.x,P.y))*(1 - (rmup + 1.i*imup)/(rmuc + 1.i*imuc))*(dx(u1)*(-N.y) + dy(u1)*(N.x))*(dx(v1)*(-N.y) + dy(v1)*(N.x)) 
+					- fcouche(theta(P.x,P.y))*k^2*((repsc + 1.i*iepsc)*(rmup + 1.i*imup) - 0.5*(repsp + 1.i*iepsp)*(rmup + 1.i*imup) -  0.5*(repsc + 1.i*iepsc)*(rmuc + 1.i*imuc))*u1*v1 )
+				- (1./( delta*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) ))*delta^2*
+					( (1. - (rmup + 1.i*imup)/(rmuc + 1.i*imuc))*fcouche(theta(P.x,P.y))*(dx(u1)*(-N.y) + dy(u1)*(N.x))*(dx(v1)*(-N.y) + dy(v1)*(N.x))
+					 + fcouche(theta(P.x,P.y))*k^2*((repsc + 1.i*iepsc)*(rmup + 1.i*imup) - 0.5*(repsp + 1.i*iepsp)*(rmup + 1.i*imup) -  0.5*(repsc + 1.i*iepsc)*(rmuc + 1.i*imuc))*u1*v1 ) );
+
+
+varf Cl2(u2,v2) = int2d(Mh2)(1./(rmum + 1i*imum)*(dx(u2)*dx(v2)+dy(u2)*dy(v2)))
+		- int2d(Mh2)(k^2*(repsm+1i*iepsm)*(u2*v2))
+		+ int1d(Mh2,1)( (1./( delta*fcouche(theta(P.x,P.y))*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) ))*u2*v2 );
+
+
+varf Cl3(u1,v2) = int1d(Mh1,1)(-(1./( delta*fcouche(theta(P.x,P.y))*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) )) *u1*v2
+				+ (1./( delta*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) ))*delta^2*
+					( (1. - (rmup + 1.i*imup)/(rmuc + 1.i*imuc))*fcouche(theta(P.x,P.y))*(dx(u1)*(-N.y) + dy(u1)*(N.x))*(dx(v2)*(-N.y) + dy(v2)*(N.x))
+					 + fcouche(theta(P.x,P.y))*k^2*((repsc + 1.i*iepsc)*(rmup + 1.i*imup) - 0.5*(repsp + 1.i*iepsp)*(rmup + 1.i*imup) -  0.5*(repsc + 1.i*iepsc)*(rmuc + 1.i*imuc))*u1*v2 ) );
+
+
+varf Cl4(u2,v1) = int1d(Mh2,1)(-(1./( delta*fcouche(theta(P.x,P.y))*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) )) *u2*v1 
+				+ (1./( delta*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) ))*delta^2*
+					( fcouche(theta(P.x,P.y))*(1 - (rmup + 1.i*imup)/(rmuc + 1.i*imuc))*(dx(u2)*(-N.y) + dy(u2)*(N.x))*(dx(v1)*(-N.y) + dy(v1)*(N.x)) 
+					+ fcouche(theta(P.x,P.y))*k^2*((repsc + 1.i*iepsc)*(rmup + 1.i*imup) - 0.5*(repsp + 1.i*iepsp)*(rmup + 1.i*imup) -  0.5*(repsc + 1.i*iepsc)*(rmuc + 1.i*imuc))*u2*v1 ) );
+
+
+matrix<complex> A11 = Cl1(Xh1,Xh1);
+matrix<complex> A12 = Cl3(Xh1,Xh2);
+matrix<complex> A21 = Cl4(Xh2,Xh1);
+matrix<complex> A22 = Cl2(Xh2,Xh2);
+
+// ---------------------------------------------------------------
+// Construction du second membre
+// ---------------------------------------------------------------
+
+Xh<complex> UI = 0;
+Xh<complex> f = 0;
+
+if (typeuinc==0)
+// Onde incidente onde plane
+{
+func dscalx = d1*x +d2*y;
+func dscaln = d1*cos(atan2(y,x))+d2*sin(atan2(y,x));
+func uinc = exp(1.i*k*dscalx);
+func duinc = (1.i*k*dscaln)*exp(1.i*k*dscalx);
+UI =uinc;
+f = duinc;
+}
+else if (typeuinc==1)
+// Onde incidente point source
+{
+func XmX0 = sqrt((x-x0)^2+(y-y0)^2);
+func uincpoint = jn(0,k*XmX0)+1.i*yn(0,k*XmX0);
+func XmX0scaln = k*((x-x0)*cos(atan2(y,x))+(y-y0)*sin(atan2(y,x)))/XmX0;
+func duincpoint = -XmX0scaln*(jn(1,k*XmX0)+1.i*yn(1,k*XmX0));
+UI=uincpoint;
+f = duincpoint;
+}
+
+varf impclass1(u,v)=int1d(Mh1,2)(((1./(rmup + 1.i*imup))*f - 1.i*k*UI)*conj(v));
+varf impclass2(u,v)=int1d(Mh2,1)( v - v);
+complex[int] F1 = impclass1(0,Xh1);
+complex[int] F2 = impclass2(0,Xh2);
+
+// ---------------------------------------------------------------
+// Résolution 2
+// ---------------------------------------------------------------
+
+complex[int] FW = [F1,F2];
+matrix<complex> AW = [[A11,A21],[A12,A22]];
+set(AW,solver=UMFPACK);
+complex[int] S = AW^-1*FW;
+complex[int] F7(A11.n);
+complex[int] F8(A22.n);
+for (int i = 0; i < FW.n; i++) { if (i < A11.n) { F7[i] = S[i] ;} else {F8[i - A11.n] = S[i];}};
+Xh1<complex> sol1 = F7;
+//sol1[]=F6[0:A11.n-1]
+Xh2<complex> sol2 = F8;
+
+// ---------------------------------------------------------------
+// Affichage
+// ---------------------------------------------------------------
+
+Xh1 uplot1;
+Xh2 uplot2;
+
+uplot1 = real(sol1);
+uplot2 = real(sol2);
+
+if (photosave == 1){
+plot(uplot1,uplot2,wait=1,fill=1, value = 1, ps = "H_L_onde_" + typeuinc + "_delta_" + delta + "_" + (rmup - rmuc) + "_" + (rmum - rmuc) + "_" + (repsp - repsc) + "_" + (repsm - repsc) + "_" + (imup - imuc) + "_" + (imum - imuc) + "_" + (iepsp - iepsc) + "_" + (iepsm - iepsc) );}
+else {
+if (plotsol == 1){
+plot(uplot1, uplot2,wait = 1,fill = 1,value = 1);}
+}
+
+// ---------------------------------------------------------------
+// Ecriture du resultat
+// ---------------------------------------------------------------
+{
+	if (ecrire == 1){
+		ofstream Err1("Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
+			Err1 << sol1[];
+
+		ofstream Err2("Resultats/Asymp2_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
+			Err2 << sol2[];
+	}
+cout << delta << endl;
+}
+

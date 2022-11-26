@@ -1,0 +1,135 @@
+load "msh3"
+load "medit"
+load "PETSc"
+include "getARGV.idp";
+
+int ecrire = getARGV("-ecrire",0);
+real Rext = 2;
+int NptL = getARGV("-NptL",40);
+int NmNev = getARGV("-NmNev",5);
+int attente = 0;
+int Plot = 0;
+
+real cpu = clock();
+
+int pext = NptL;
+border Sigmaext(t=0,2*pi){x=Rext*cos(t);y=Rext*sin(t);label=1;};
+mesh Mh = buildmesh(Sigmaext(pext));
+meshL MhB = extract(Mh);
+if (Plot == 1){
+plot(Mh,wait = attente);
+plot(MhB,wait = attente);}
+fespace Xh(Mh,P2);
+fespace XhB(MhB,P2);
+varf Cl(u,v) = int2d(Mh)(dx(u)*dx(v)+dy(u)*dy(v))
+		- int2d(Mh)(u*v);
+varf ClB(u,v) = int1d(MhB)( (dx(u)*(Tl.x) + dy(u)*(Tl.y))*(dx(v)*(Tl.x) + dy(v)*(Tl.y)) );
+varf id(u,v) = int1d(MhB)(u*v);
+matrix B = ClB(XhB,XhB, solver = sparsesolver);
+matrix I = id(XhB, XhB, solver=sparsesolver, eps=1e-20);
+matrix<complex> A = Cl(Xh,Xh);
+set(A,solver=sparsesolver);
+
+//Resolution
+real x0=0, y0 = 2.5;
+Xh<complex> UI = 0;
+Xh<complex> f = 0;
+Xh<complex> sol;
+Xh<complex> solp;
+func XmX0 = sqrt((x-x0)^2+(y-y0)^2);
+func uincpoint = jn(0,XmX0)+1.i*yn(0,XmX0);
+func XmX0scaln = ((x-x0)*cos(atan2(y,x))+(y-y0)*sin(atan2(y,x)))/XmX0;
+func duincpoint = -XmX0scaln*(jn(1,XmX0)+1.i*yn(1,XmX0));
+UI=uincpoint;
+f = duincpoint;
+varf impclass(u,v)=int1d(Mh,1)((f - 1.i*UI)*conj(v));
+complex[int] F = impclass(0,Xh);
+complex[int] S = A^-1*F;
+sol[] = S;
+Xh uplotA;
+uplotA = real(sol);
+if (Plot == 1){
+plot(uplotA,wait = attente,fill = 1,value = 1,cmm = "A");}
+
+// TEST EIGENVALUE
+int n = B.n;
+int Nev = n - NmNev;
+complex[int,int] D(n,n);
+D = 0;
+matrix<complex> DmM;
+matrix<complex> BC;
+BC = B;
+matrix<complex> BN;
+matrix<complex> BN1;
+matrix<complex> BN2;
+matrix<complex> B1;
+matrix<complex> B2;
+matrix eVMatr;
+matrix<complex> eVMat;
+matrix<complex> Dm;
+matrix IPr = interpolate(Xh,XhB,inside = 1);
+matrix<complex> IP = IPr;
+real[int] ev(n);
+XhB[int] eV(n);
+real[int,int] eV2(n,n);
+eV2 = 0;
+Mat dB(B);
+Mat dI(I);
+EPSSolve(dB, dI, values = ev, vectors = eV, sparams = " -eps_nev " + Nev + " -eps_gen_hermitian" );
+for (int i = 0; i < Nev; i++){
+	D(i,i) = ev(n - (i + 1));
+	eV2(:,i) = I*eV[n - (i + 1)][];
+}
+eVMatr = eV2;
+eVMat = eVMatr;
+Dm = D;
+DmM = Dm*eVMat';
+BN = eVMat*DmM;
+BN1 = BN*IP';
+BN2 = IP*BN1;
+B1 = BC*IP';
+B2 = IP*B1;
+cout << ev << endl;
+
+XhB uploteV0N;
+uploteV0N = real(eV[0]);
+if (Plot == 1){
+plot(uploteV0N,wait = attente,fill = 1,value = 1,cmm = "eV0");}
+
+Xh<complex> newSolN;
+matrix<complex> newAN = A + BN2;
+set(newAN,solver = sparsesolver);
+complex[int] newSN = newAN^-1*F;
+newSolN[] = newSN;
+
+Xh<complex> newSol;
+matrix<complex> newA = A + B2;
+set(newA,solver = sparsesolver);
+complex[int] newS = newA^-1*F;
+newSol[] = newS;
+
+
+Xh uplotN;
+uplotN = real(newSolN);
+if (Plot == 1){
+plot(uplotN,wait = attente,fill = 1,value = 1,cmm = "BN");}
+
+Xh uplot;
+uplot = real(newSol);
+if (Plot == 1){
+plot(uplot,wait = attente,fill = 1,value = 1,cmm = "B");}
+
+{
+	if (ecrire == 1){
+		ofstream Sol("Resultats3/SolSLEPC_NptL"+ NptL+".dat", append);
+			Sol << newSolN[];
+
+		ofstream Eig("Resultats3/EigSLEPC_NptL"+ NptL+".dat", append);
+			Eig << ev;
+
+		ofstream Time("Resultats3/Time.txt",append);
+			Time.precision(15);
+			Time << "NptL = " << NptL << endl;
+			Time << "TimeSLEPC = " << (clock()-cpu) << endl;
+			Time << endl;}
+}

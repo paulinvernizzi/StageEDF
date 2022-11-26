@@ -1,0 +1,302 @@
+include "getARGV.idp";
+
+// --------------------------------------------------------------
+// Options
+// -------------------------------------------------------------
+
+// Onde incidente // Attention, si on veut changer l'onde incidente, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
+int typeuinc = getARGV("-uinc",1) ; // 0 = onde plane, 1 = point source
+
+// Domaines interessants
+int PlusDomaineOnly = getARGV("-dpo", 1) ; // explicit enough
+
+// Plot
+int plotmaill = 1; // Plot les maillages ? 0 = Non, 1 = Oui
+int ploterror = 1; // Plot l'erreur ? 0 = Non, 1 = Oui
+int plotsol = 1; // Plot les solutions ? 0 = Non, 1 = Oui
+int attente= 1;
+
+// Forme couche
+int typecouche = getARGV("-typecouche",0) ; // 0 = bosse gauche, 1 = bosse haut, 2 = bosse haut gauche, 3 = 5 bosses symètrie axe ordonnée, 4 = 5 bosses symétrie axe abscisse
+
+// --------------------------------------------------------------
+// Paramétrage 
+// --------------------------------------------------------------
+
+
+// definition de variables physiques // Attention, si on veut changer les données sur moins ou plus, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
+real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
+real repsp =  getARGV("-repsp",1.), iepsp = getARGV("-iepsp",0.); // epsilon plus
+real repsc = getARGV("-re",3.), iepsc = getARGV("-ie",0.); // epsilon couche
+real rmum =  getARGV("-rmum",1.), imum = getARGV("-imum",0.); // mu moins
+real rmup =  getARGV("-rmup",1.), imup = getARGV("-imup",0.); // mu plus
+real rmuc = getARGV("-rm",10.), imuc = getARGV("-im",0.); // mu couche
+
+//parametres geometrie et nb d'onde
+real k = getARGV("-k",1.); // nombre d'onde
+real lambdap = 2*pi/(abs(k)*sqrt(abs((repsp + iepsp)*(rmup + imup))));
+real lambdac = 2*pi/(abs(k)*sqrt(abs((repsc + iepsc)*(rmuc + imuc))));
+real lambdam = 2*pi/(abs(k)*sqrt(abs((repsm + iepsm)*(rmum + imum))));
+real lambda = 2*pi/abs(k);
+real Rext = 2 * lambda; // Rayon du cercle exterieur
+real unit = lambda;  // Unite de mesure
+real rpet = unit; // Rayon du cercle intérieur
+real rmoy = rpet + 0.5*lambda; //Rayon limite pour l'erreur
+real rint = rpet - 0.25*lambdam; //Rayon limite pour l'erreur
+real delta = getARGV("-delta", 0.1);
+
+// Onde incidente
+real d1=1., d2=0.; // pour l'onde plane
+real x0=0, y0 = 2.5*lambda; // pour le point source
+
+
+
+// fonction annexe
+real a = 0;
+real b = 0;
+func real theta(real px, real py) { if (px == 0) {return ((py > 0)* pi/2. + (py< 0) * -pi/2.);} else {return atan2(py,px);} ;};
+if (typecouche == 0){ a = 1. ; b = -1. * pi ; } // bosse vers la gauche
+if (typecouche == 1){ a = 1. ; b = -1 * pi/2 ; } // bosse vers le haut
+if (typecouche == 2){ a = 1. ; b = -3 * pi/4 ; } // bosse en haut à gauche
+if (typecouche == 3){ a = 5. ; b = pi/2 ; } // 5 bosses symètrie axe ordonnée
+if (typecouche == 4){ a = - 5. ; b = 0;  } // 5 bosses symétrie axe abscisse
+if (typecouche == 5){ a = 0; b = 0;} // f constant égal à 1
+func real fcouche(real t) {return (1. + cos(a*t + b)) * 3./8. + 0.25;};
+
+// ---------------------------------------------------------------
+// Maillage 
+// ---------------------------------------------------------------
+
+// Construction du maillage
+border Sigmaext(t=0,2*pi){x=Rext*cos(t);y=Rext*sin(t);label=2;}; // Bord exterieur
+border limit(t=0,2*pi){x = rmoy*cos(t);y = rmoy*sin(t);label = 4;};
+border cpet(t=0,2*pi){x=rpet*cos(t);y=rpet*sin(t);label=1;}; // Bord cercle intérieur
+border couche(t=0,2*pi){x=(rpet + delta*fcouche(t))*cos(t);y=(rpet + delta * fcouche(t))*sin(t);label=3;}; // Bord de la couche fine
+border cint(t=0,2*pi){x = rint*cos(t); y =rint*sin(t);label= 5;}; // 
+
+//nombre de partitions
+real NptLa = getARGV("-NptLa",90);
+int pexta = 2*pi*NptLa*Rext/lambdap;
+int pmoya = 2*pi*NptLa*rmoy/lambdap;
+int pinta = 2*pi*NptLa*rint/lambdam;
+int ppeta = 2*pi*rpet*NptLa/min(lambdac,lambdam,10*delta);
+int pcouchea = 2*pi*rpet*NptLa/min(lambdap,lambdac,10*delta);
+
+real NptLp = getARGV("-NptL",100);
+int pextp = 2*pi*NptLp*Rext/lambdap;
+int pmoyp = 2*pi*NptLp*rmoy/lambdap;
+int pintp = 2*pi*NptLp*rint/lambdam;
+int ppetp = 2*pi*rpet*NptLp/min(lambdac,lambdam,10*delta);
+int pcouchep = 2*pi*rpet*NptLp/min(lambdap,lambdac,10*delta);
+
+mesh MhDa = buildmesh(cpet(ppeta) +
+		couche(pcouchea) +
+		limit(pmoya) +
+		cint(pinta) +
+		Sigmaext(pexta));
+
+mesh MhDp = buildmesh(cpet(ppetp) +
+		couche(pcouchep) +
+		limit(pmoyp) +
+		cint(pintp) +
+		Sigmaext(pextp));
+
+
+// Construction espace elements finis pour fonction regions
+fespace Ph(MhDp,P0);
+Ph reg = region;
+int iregmoins = reg(0,0);
+int iregplus = reg(Rext*0.99,0);
+int iregmoy = reg(rmoy - 0.000001,0);
+int iregcouche = reg(rpet + 0.000001,0);
+int iregint = reg(rint + 0.000001,0);
+Ph is1 = (region == iregplus) + (region == iregcouche) + (region == iregmoy);
+Ph is2 = (region == iregmoins) + (region == iregint);
+Ph is3 = (region == iregcouche);
+if (plotmaill == 1){
+	// Construction maillage séparé
+	mesh MhDp1 = trunc(MhDp,abs(is1));
+	mesh MhDp2 = trunc(MhDp,abs(is2));
+	mesh MhDp3 = trunc(MhDp,abs(is3));
+	mesh MhDa1 = trunc(MhDa,abs(is1));
+	mesh MhDa2 = trunc(MhDa,abs(is2));
+	mesh MhDa3 = trunc(MhDa,abs(is3));
+	plot(MhDp1, wait= attente,cmm = "MhDp1");
+	plot(MhDp2, wait=attente,cmm = "MhDp2");
+	plot(MhDp3,wait = attente,cmm = "MhDp3");
+	plot(MhDa1, wait= attente,cmm = "MhDa1");
+	plot(MhDa2, wait=attente,cmm = "MhDa2");
+	plot(MhDa3,wait = attente,cmm = "MhDa3");
+}
+
+// Construcion mu et epsilon
+Ph reps = repsc + (repsp - repsc)*((region == iregplus) + (region == iregmoy)) + (repsm - repsc)*((region == iregmoins)+ (region == iregint));
+Ph ieps = iepsc + (iepsp - iepsc)*((region == iregplus) + (region == iregmoy)) + (iepsm - iepsc)*((region == iregmoins)+ (region == iregint));
+Ph rmu = rmuc + (rmup - rmuc)*((region == iregplus) + (region == iregmoy)) + (rmum - rmuc)*((region == iregmoins) + (region == iregint));
+Ph imu = imuc + (imup - imuc)*((region == iregplus) + (region == iregmoy)) + (imum - imuc)*((region == iregmoins)+ (region == iregint));
+
+// Construction espace elements finis pour les solutions
+fespace XhDa(MhDa,P1);
+fespace XhDp(MhDp,P1);
+
+varf Mp(u,v) = int2d(MhDp)((region == iregplus)*u*v);
+matrix<complex> MMp = Mp(XhDp,XhDp);
+varf Mdp(u,v) = int2d(MhDp)((region == iregplus)*(dx(u)*dx(v) + dy(u)*dy(v) + u*v));
+matrix<complex> MMdp = Mdp(XhDp,XhDp);
+
+// ---------------------------------------------------------------
+// Ecriture de la formulation variationnelle 1
+// ---------------------------------------------------------------
+
+
+varf Cla(u,v)=int2d(MhDa)(1./(rmu + 1i*imu)*(dx(u)*dx(conj(v))+dy(u)*dy(conj(v))))
+		- int2d(MhDa)(k^2*(reps+1.i*ieps)*(u*conj(v)))
+		- int1d(MhDa,2)(1.i*k*(u*conj(v)));
+
+matrix<complex> Aa = Cla(XhDa,XhDa);
+set(Aa,solver=UMFPACK);
+
+// ---------------------------------------------------------------
+// Ecriture de la formulation variationnelle 2
+// ---------------------------------------------------------------
+
+varf Clp(u,v)=int2d(MhDp)(1./(rmu + 1i*imu)*(dx(u)*dx(conj(v))+dy(u)*dy(conj(v))))
+		- int2d(MhDp)(k^2*(reps+1.i*ieps)*(u*conj(v)))
+		- int1d(MhDp,2)(1.i*k*(u*conj(v)));
+
+matrix<complex> Ap = Clp(XhDp,XhDp);
+set(Ap,solver=UMFPACK);
+
+
+// ---------------------------------------------------------------
+// Construction du second membre
+// ---------------------------------------------------------------
+
+XhDp<complex> UIp = 0;
+XhDp<complex> fp = 0;
+XhDa<complex> UIa = 0;
+XhDa<complex> fa = 0;
+
+if (typeuinc==0)
+// Onde incidente onde plane
+{
+func dscalx = d1*x +d2*y;
+func dscaln = d1*cos(atan2(y,x))+d2*sin(atan2(y,x));
+func uinc = exp(1.i*k*dscalx);
+func duinc = (1.i*k*dscaln)*exp(1.i*k*dscalx);
+UIp = uinc;
+fp = duinc;
+UIa = uinc;
+fa = duinc;
+}
+else if (typeuinc==1)
+// Onde incidente point source
+{
+func XmX0 = sqrt((x-x0)^2+(y-y0)^2);
+func uincpoint = jn(0,k*XmX0)+1.i*yn(0,k*XmX0);
+func XmX0scaln = k*((x-x0)*cos(atan2(y,x))+(y-y0)*sin(atan2(y,x)))/XmX0;
+func duincpoint = -XmX0scaln*(jn(1,k*XmX0)+1.i*yn(1,k*XmX0));
+UIa = uincpoint;
+fa = duincpoint;
+UIp = uincpoint;
+fp = duincpoint;
+}
+
+varf impclassp(u,v)=int1d(MhDp,2)(((1./(rmup + 1.i*imup))*fp - 1.i*k*UIp)*conj(v));
+complex[int] Fp = impclassp(0,XhDp);
+varf impclassa(u,v)=int1d(MhDa,2)(((1./(rmup + 1.i*imup))*fa - 1.i*k*UIa)*conj(v));
+complex[int] Fa = impclassa(0,XhDa);
+
+// ---------------------------------------------------------------
+// Résolution 1
+// ---------------------------------------------------------------
+
+XhDa<complex> sola;
+sola[] = Aa^-1*Fa;
+
+// ---------------------------------------------------------------
+// Résolution 2
+// ---------------------------------------------------------------
+XhDp<complex> solp;
+solp[] = Ap^-1*Fp;
+
+// ---------------------------------------------------------------
+// Résolution erreur
+// ---------------------------------------------------------------
+XhDp<complex> solai;
+XhDp<complex> solaix;
+XhDp<complex> solaiy;
+
+matrix IP = interpolate(XhDp,XhDa);
+matrix IPx = interpolate(XhDp,XhDa, op = 1);
+matrix IPy = interpolate(XhDp,XhDa, op = 2);
+
+solai[] = IP*sola[];
+solaix[] = IPx*sola[];
+solaiy[] = IPy*sola[];
+
+XhDp<complex> solpx = dx(solp);
+XhDp<complex> solpy = dy(solp);
+
+complex[int] diff = solp[] - solai[];
+complex[int] diffx = solpx[] - solaix[];
+complex[int] diffy = solpy[] - solaiy[];
+
+complex[int] Mdiffp = MMp*diff;
+complex[int] Mdiffdp = MMdp*diff;
+complex[int] Mdiffdpx = MMp*diffx;
+complex[int] Mdiffdpy = MMp*diffy;
+
+complex errorPlusD = sqrt( Mdiffp'*diff);
+complex errorH1PlusD = sqrt( Mdiffdp'*diff);
+complex errorH1PlusE = sqrt( Mdiffp'*diff + Mdiffdpx'*diffx + Mdiffdpy'*diffy);
+
+complex errorPlusA = sqrt( int2d(MhDp)( (region == iregplus)*(sola - solp)*conj(sola - solp)  ));
+complex errorPlusB = sqrt( int2d(MhDp)( (region == iregplus)*(solai - solp)*conj(solai - solp)  ));
+complex errorH1PlusA = sqrt( int2d(MhDp)( (region == iregplus)*( (sola - solp)*conj(sola - solp) + (dx(sola) - dx(solp))*(conj(dx(sola)) - conj(dx(solp))) + (dy(sola) - dy(solp))*(conj(dy(sola)) - conj(dy(solp))) )));
+complex errorH1PlusB = sqrt( int2d(MhDp)( (region == iregplus)*( (solai - solp)*conj(solai - solp) + (dx(solai) - dx(solp))*(conj(dx(solai)) - conj(dx(solp))) + (dy(solai) - dy(solp))*(conj(dy(solai)) - conj(dy(solp))) )));
+complex errorH1PlusC = sqrt( int2d(MhDp)( (region == iregplus)*( (solai - solp)*conj(solai - solp) + (solaix - dx(solp))*(conj(solaix) - conj(dx(solp))) + (solaiy - dy(solp))*(conj(solaiy) - conj(dy(solp))) )));
+
+
+// ---------------------------------------------------------------
+// Affichage
+// ---------------------------------------------------------------
+
+XhDp uplotp;
+XhDa uplota;
+XhDp err;
+uplota = real(sola);
+uplotp = real(solp);
+err = abs(uplotp - uplota);
+
+if (plotsol == 1){
+plot(uplota,wait = 1,fill = 1,value = 1);
+plot(uplotp, wait = 1, fill = 1, value = 1);}
+if (ploterror == 1){
+plot(err, wait = 1, fill = 1, value = 1);}
+
+// ---------------------------------------------------------------
+// Ecriture du resultat
+// ---------------------------------------------------------------
+cout << "errorH1PlusA = " << real(errorH1PlusA) << " Calculee directement avec l integrale sans interpoler avant" << endl;
+cout << "errorH1PlusB = " << real(errorH1PlusB) << " Calculee directement avec l integrale en interpolant l identite seulement avant" << endl;
+cout << "errorH1PlusC = " << real(errorH1PlusC) << " Calculee directement avec l integrale en interpolant l identite et les operateurs dx et dy avant" << endl;
+cout << "errorH1PlusD = " << real(errorH1PlusD) << " Calculee matriciellement en interpolant l identite seulement" << endl;
+cout << "errorH1PlusE = " << real(errorH1PlusE) << " Calculee matriciellement en interpolant l identite et les operateurs dx et dy" << endl;
+cout << "errorPlusA = " << real(errorPlusA) << " Calculee directement avec l integrale sans interpoler avant" << endl;
+cout << "errorPlusB = " << real(errorPlusB) << " Calculee directement avec l integrale en interpolant avant" << endl;
+cout << "errorPlusD = " << real(errorPlusD) << " Calculee matriciellement" << endl;
+{
+	ofstream Err("Erreurs/Erreurs3.dat", append);
+		Err.precision(15);
+		Err << "delta = "<< delta << endl;
+		Err << "errorH1PlusA = " << real(errorH1PlusA) << " Calculee directement avec l integrale sans interpoler avant" << endl;
+		Err << "errorH1PlusB = " << real(errorH1PlusB) << " Calculee directement avec l integrale en interpolant l identite seulement avant" << endl;
+		Err << "errorH1PlusC = " << real(errorH1PlusC) << " Calculee directement avec l integrale en interpolant l identite et les operateurs dx et dy avant" << endl;
+		Err << "errorH1PlusD = " << real(errorH1PlusD) << " Calculee matriciellement en interpolant l identite seulement" << endl;
+		Err << "errorH1PlusE = " << real(errorH1PlusE) << " Calculee matriciellement en interpolant l identite et les operateurs dx et dy" << endl;
+		Err << "errorPlusA = " << real(errorPlusA) << " Calculee directement avec l integrale sans interpoler avant" <<  endl;
+		Err << "errorPlusB = " << real(errorPlusB) << " Calculee directement avec l integrale en interpolant avant" << endl;
+		Err << "errorPlusD = " << real(errorPlusD) << " Calculee matriciellement" << endl;
+		Err << endl;
+}
