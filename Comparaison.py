@@ -1,118 +1,95 @@
 # coding=utf-8
+
+#####################################################################################
+# This program compares the asymptotic model (AM) and the thin layer model (TLM).
+# README files explains precisely which equations are studied.
+# The goal is to draw a graph of the relative error between both models
+# following the thin layer thickness "delta0".
+# To work it requires the following programs :
+# - Helmh_Comparaison_appel.edp
+# - Helmh_Comparaison_calcul.edp
+# - Helmh_Comparaison_comparaison.edp (PETS-c code)
+# - Helmh_delta.edp (PETS-c code)
+# - Helmh_asymptotic.edp (if you want to test the asymptotic model at order 1)
+# - Helmh_asymptotic_ordre2.edp (if you want to test the asymptotic model at order 2).
+#####################################################################################
+
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.transforms as trs
 
 ## OPTIONS ##
 creation = True # True if you want to calculate the error, False if you just want to manipulate the graph
 graph = True	# True if you want to see the graph
-log = 1 #1 if you want a log scale, 0 otherwise
 savefig = 1 # 1 if you want to save the figure, 0 otherwise
-Xticks = [0.03,0.05,0.1,0.2,0.3]
-avectitre = False
+Xticks = [0.03,0.05,0.1,0.2,0.3] # Ticks that will apear on the graph
+avectitre = False # True if you want a title on the graph
+
+## PATHS ##
+PATHTOFIGUREFOLDER = "/home/c31182/Helmh/Figures/"
+PATHTOPROGRAMFOLDER = "/home/c31182/Helmh/Programs/"
+PATHTOTEMPFOLDER = "/home/c31182/Helmh/TEMP/"
+PATHTOSAVEFOLDER = "/home/c31182/Helmh/ErreursSauvees/"
 
 ## PARAMETERS ##
+# Program and geometry parameters
 uinc = 0 # Type of the incident wave (1 : source point, 0 : planar wave)
-typecouche = 0 # Type of the thin layer (0 : cos(t - pi), 1 : cos(t - pi/2), 2 : cos(t - 3pi/4), 3 : cos(5t), 4 : cos(-5t), 5 : 1 
-debutdelta = 0.5 # The first measure of the parameter delta
-findelta = 0.005 # The final measure of the parameter delta
-Niter = 20 # The number of points in the graph
+typecouche = 0 # Type of the thin layer (0 : cos(t - pi), 1 : cos(t - pi/2), 2 : cos(t - 3pi/4), 3 : cos(5t), 4 : cos(-5t), 5 : 1
+debutdelta = 0.5 # First measure of the parameter delta (thickness of the thin layer)
+findelta = 0.005 # Final measure of the parameter delta
+Niter = 20 # Number of points in the graph
 Nptlambda = 50 # Mesh parameter
-ordre = 1 # Order in delta of the modelisation
+ordre = 1 # Asymptotical order in delta of the modelisation
 
-#Paramètre physique
+# Physical parameter
 k = 1
-rmup, imup = 0.01,0.
-repsp, iepsp = 100.,0.1
-rmum, imum = 0.01,0.
-repsm, iepsm = 100.,0.1
-rmuc, imuc = 0.1,0.
-repsc, iepsc = 100,0.1
+rmup, imup = 0.01,0. # mu in plus domain
+repsp, iepsp = 100.,0.1 # epsilon in plus domain
+rmum, imum = 0.01,0. # mu in minus domain
+repsm, iepsm = 100.,0.1 # epsilon in minus domain
+rmuc, imuc = 0.1,0. # mu in the thin layer
+repsc, iepsc = 100,0.1 # epsilon in the thin layer
 
-## CODE ##
-
-# SAVE AND FIGURE NAME#
-if typecouche == 0 :
-	a = "1"
-	b = "-pi"
-if typecouche == 1 :
-	a = "1"
-	b = "-pi/2"
-if typecouche == 2 :
-	a = "1"
-	b = "-3*pi/4"
-if typecouche == 3 :
-	a = "5"	
-	b = "+ pi/2"
-if typecouche == 4 :
-	a = "-5"
-	b = "+ 0"
-if typecouche == 5 :
-	a = "0"
-	b = "+ 0"
-f = "(1 + cos("+a+"t "+b+" )*3/8 + 1/4"
-if uinc == 1:
-	onde = "un point source"
-else:
-	onde = "une onde incidente plane"
-titre = "Erreurs L2 et H1 du modele asymptotique a l ordre "+str(ordre)+" selon delta"
-if avectitre :
-	savename = "O"+str(ordre)+"_T"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_d_"+str(debutdelta)+"_"+str(findelta)+"_NptL_"+str(Nptlambda) + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm)
-else :
-	savename = "O"+str(ordre)+"_T"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_d_"+str(debutdelta)+"_"+str(findelta)+"_NptL_"+str(Nptlambda) + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm) + "_sans_titre"
+# SAVE AND FIGURE NAME AND PATH#
+a = ["1","1","1","5","-5","0"]
+b = ["-pi","-pi/2","-3*pi/4","+ pi/2","+ 0","+ 0"]
+onde = ["an incident plane","a source point"]
+f = "(1 + cos("+a[typecouche]+"t "+b[typecouche]+" )*3/8 + 1/4"
+titre = "L2 and H1 relative error between TLM and AM at order "+str(ordre)+" following delta"
+savename = "O"+str(ordre)+"_T"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_d_"+str(debutdelta)+"_"+str(findelta)+"_NptL_"+str(Nptlambda) + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm)
 
 # LISTS #
-
-X = []
-Yp = []
-Yhp = []
-Zp = []
-Zhp = []
-ZpA = []
-ZhpA = []
-Droite = []
-Droite2 = []
+X,Yp,Yhp,Zp,Zhp = [],[],[],[],[]
+Listes = [[],[],[],[],[]]
 
 # COMPARISON #
 if creation :
-	os.system("FreeFem++ /home/c31182/Helmh/Helmh_Comparaison_LA_appel.edp -Niter "+str(Niter)+" -debutdelta "+str(debutdelta)+" -findelta "+str(findelta)+" -typecouche "+str(typecouche)+" -re "+str(repsc)+" -ie "+str(iepsc)+" -rm "+str(rmuc)+" -im "+str(imuc)+" -log "+str(log)+" -NptL "+str(Nptlambda)+ " -ordre "+str(ordre)+" -uinc "+str(uinc) + " -k "+ str(k) + " -rmup "+str(rmup) + " -imup "+str(imup)+ " -repsp "+str(repsp) + " -iepsp "+str(iepsp)+ " -rmum "+str(rmum) + " -imum "+str(imum)+ " -repsm "+str(repsm) + " -iepsm "+str(iepsm))
-	os.system("mv Erreurs2/Erreur.dat ErreursSauvees/Erreurs_log"+str(log)+"_typecouche_"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_N_"+str(Niter)+"_delta0_"+str(debutdelta)+"_deltan_"+str(findelta)+"_NptL_"+str(Nptlambda)+"_ordre_"+str(ordre)+"_uinc_"+str(uinc)+ "_k_"+ str(k) + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm)+".txt") ## renome le fichier
+	os.system("FreeFem++ "+PATHTOPROGRAMFOLDER+"Helmh_Comparaison_appel.edp -Niter "+str(Niter)+" -debutdelta "+str(debutdelta)+" -findelta "+str(findelta)+" -typecouche "+str(typecouche)+" -re "+str(repsc)+" -ie "+str(iepsc)+" -rm "+str(rmuc)+" -im "+str(imuc)+" -NptL "+str(Nptlambda)+ " -ordre "+str(ordre)+" -uinc "+str(uinc) + " -k "+ str(k) + " -rmup "+str(rmup) + " -imup "+str(imup)+ " -repsp "+str(repsp) + " -iepsp "+str(iepsp)+ " -rmum "+str(rmum) + " -imum "+str(imum)+ " -repsm "+str(repsm) + " -iepsm "+str(iepsm) + " -PTPF " + str(PATHTOPROGRAMFOLDER) + " -PTTF " + str(PATHTOTEMPFOLDER))
+	os.system("mv "+PATHTOTEMPFOLDER+"Erreur.dat "+PATHTOSAVEFOLDER+"Erreurs_typecouche_"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_N_"+str(Niter)+"_delta0_"+str(debutdelta)+"_deltan_"+str(findelta)+"_NptL_"+str(Nptlambda)+"_ordre_"+str(ordre)+"_uinc_"+str(uinc)+ "_k_"+ str(k) + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm)+".txt") ## renome le fichier
 
 # GRAPH #
 if graph :
-	nom = "ErreursSauvees/Erreurs_log"+str(log)+"_typecouche_"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_N_"+str(Niter)+"_delta0_"+str(debutdelta)+"_deltan_"+str(findelta)+"_NptL_"+str(Nptlambda)+"_ordre_"+str(ordre)+"_uinc_"+str(uinc)+ "_k_"+ str(k)  + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm)+".txt"
-	#nom = "Erreurs2/Erreur.dat"
+	nom = PATHTOSAVEFOLDER+"Erreurs_typecouche_"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_N_"+str(Niter)+"_delta0_"+str(debutdelta)+"_deltan_"+str(findelta)+"_NptL_"+str(Nptlambda)+"_ordre_"+str(ordre)+"_uinc_"+str(uinc)+ "_k_"+ str(k)  + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm)+".txt"
+	Mots = ["Delta","Erreur Plus","Erreur H1Plus","Erreur H1Plus","Erreur Relative Plus","Erreur Relative H1Plus"]
 	with open(nom,"r") as fichier:
 		for ligne in fichier:
 			if (ligne != "" and ligne != "\n"):
 				if ligne == "end\n":
 					continue
-				print(ligne)
 				l = ligne.split("\n")[0]
 				mot,val = l.split(" = ")
-				if mot == "Delta" :
-					X.append(float(val))
-				if mot == "Erreur Plus" :
-					Yp.append(float(val))
-				if mot == "Erreur H1Plus" :
-					Yhp.append(float(val))
-				if mot == "Erreur Relative Plus" :
-					Zp.append(float(val))
-				if mot == "Erreur Relative H1Plus" :
-					Zhp.append(float(val))
-	Droite = [  Zp[ int(len(X)/2)]*( X[n]/X[int(len(X)/2)])**(ordre+1) for n in range(len(X))]
-	if avectitre :	
-		plt.title(titre)
+				if mot in Mots:
+					Listes[Mots.index(mot)].append(val)
+	Droite = [  Listes[3][ int(len(Listes[0])/2)]*( Listes[0][n]/Listes[0][int(len(Listes[0])/2)])**(ordre+1) for n in range(len(Listes[0]))]
+	if avectitre : plt.title(titre)
 	plt.xscale("log")
 	plt.yscale('log')
 	plt.xticks(Xticks,Xticks)
 	plt.xlabel("delta")
 	plt.ylabel("error")
-	plt.plot(X, Zp, "x", label = "Erreur Relative L2")
-	plt.plot(X, Zhp, "x", label = "Erreur Relative H1")
-	plt.plot(X, Droite, label = "y = A*x**"+str(ordre + 1 ))
+	plt.plot(Listes[0], Listes[3], "x", label = "L2 Relative Error")
+	plt.plot(Listes[0], Listes[4], "x", label = "H1 Relative Error")
+	plt.plot(Listes[0], Droite, label = "y = A*x**"+str(ordre + 1 ))
 	plt.legend()
-	if savefig == 1:
-		plt.savefig("/home/c31182/Helmh/Figures/"+savename,format = "eps", dpi = 1200,bbox_inches = "tight")
+	if savefig == 1: plt.savefig(PATHTOFIGUREFOLDER+savename,format = "eps", dpi = 1200,bbox_inches = "tight")
 	plt.show()

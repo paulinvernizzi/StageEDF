@@ -4,13 +4,17 @@ load "lapack"
 include "macro_ddm.idp"
 
 int[int] myN2OShD;
-//int[int] myN2OShA1;
-//int[int] myN2OShA2;
 macro ShDlocN2O() myN2OShD// this tells buildDmesh to keep the local to global correspondance
-//macro ShA1locN2O() myN2OShA1// this tells buildDmesh to keep the local to global correspondance
-//macro ShA2locN2O() myN2OShA2// this tells buildDmesh to keep the local to global correspondance
-
 func Pk=P2;
+
+// --------------------------------------------------------------
+// Paths
+// -------------------------------------------------------------
+
+string PTFF = getARGV("-PTFF","/home/c31182/Helmh/Figures/")
+string PTPF = getARGV("-PTPF","/home/c31182/Helmh/Programs/")
+string PTTF = getARGV("-PTTF","/home/c31182/Helmh/TEMP/")
+string PTSF = getARGV("-PTSF","/home/c31182/Helmh/ErreursSauvees/")
 
 // --------------------------------------------------------------
 // Options
@@ -48,7 +52,6 @@ int attente = 0; // Attendre pour les plots
 // Paramétrage
 // --------------------------------------------------------------
 
-
 // Definition de variables physiques // Attention, si on veut changer les données sur moins ou plus, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
 real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
 real repsp =  getARGV("-repsp",1.), iepsp = getARGV("-iepsp",0.); // epsilon plus
@@ -82,8 +85,8 @@ for (int i = 0; i < Niter; i++){
 	else{
 		delta = debutdelta;}
 	// Recupération des maillages et créations des espaces éléments finis associés
-	mesh ShA1 = readmesh("Maillages/Asymp_1_delta_" +delta+"_NptL"+ Nptlambda+".mesh");
-	mesh ShD = readmesh("Maillages/Delta_delta_" +delta+"_NptL"+ Nptlambda+".mesh");
+	mesh ShA1 = readmesh(PTTF+"Maillages/Asymp_1_delta_" +delta+"_NptL"+ Nptlambda+".mesh");
+	mesh ShD = readmesh(PTTF+"Maillages/Delta_delta_" +delta+"_NptL"+ Nptlambda+".mesh");
 
 	fespace XhA1(ShA1,P2);
 	fespace XhD(ShD,P2);
@@ -122,34 +125,26 @@ for (int i = 0; i < Niter; i++){
 	matrix<complex> MMp;
 	matrix<complex> MMdp;
 	cout << " etape 0" << endl;
-	{ifstream SolA1("Resultats/Asymp1_delta_" +delta+"_NptL"+ Nptlambda+".dat");
+	{ifstream SolA1(PTTF+"Resultats/Asymp1_delta_" +delta+"_NptL"+ Nptlambda+".dat");
 	    SolA1>>solA1[];}
 
-	{ifstream SolD("Resultats/Delta_delta_" +delta+"_NptL"+ Nptlambda+".dat");
+	{ifstream SolD(PTTF+"Resultats/Delta_delta_" +delta+"_NptL"+ Nptlambda+".dat");
 	    SolD>>solD[];}
 
-	{ifstream Matrp("Resultats/Matrixp_delta_" +delta+"_NptL"+ Nptlambda+".dat");
+	{ifstream Matrp(PTTF+"Resultats/Matrixp_delta_" +delta+"_NptL"+ Nptlambda+".dat");
 	    Matrp>>MMp;}
 
-	{ifstream Matrdp("Resultats/Matrixdp_delta_" +delta+"_NptL"+ Nptlambda+".dat");
+	{ifstream Matrdp(PTTF+"Resultats/Matrixdp_delta_" +delta+"_NptL"+ Nptlambda+".dat");
 	    Matrdp>>MMdp;}
 
 	// Matrice d'interpolation
-	cout << " etape 1" << endl;
-
 	mesh ShDloc=ShD;
 	buildDmesh(ShDloc);
 
 	fespace XhDloc(ShDloc,P2);
-
-
 	 matrix IP1 = interpolate(XhDloc,XhA1,inside = 1);
-	 cout << " etape 2" << endl;
 
 	// Calcul des erreurs
-
-
-
 	Mat<complex> APETSc; //Parallel PETSc matrix
 	createMat(ShDloc, APETSc, Pk);
 	XhD<complex> solDA1;
@@ -166,7 +161,6 @@ for (int i = 0; i < Niter; i++){
 	XhD<complex> solDA1tmp;
 	solDA1tmp[](subIdx)= solDA1loc[];
 
-
 	mpiAllReduce(solDA1tmp[],solDA1[], mpiCommWorld,mpiSUM);
 	}
 
@@ -180,14 +174,8 @@ if(mpirank==0){
 	complex[int] diff1 = solD[] - solDA1[];
 	complex[int] Mdiffp = MMp*diff1;
 	complex[int] Mdiffdp = MMdp*diff1;
-	cout << " etape 3" << endl;
 	complex errorPlus = sqrt( Mdiffp'*diff1);
 	complex errorH1Plus = sqrt( Mdiffdp'*diff1);
-	//complex errorPlusA = sqrt( int2d(ShD)( (region == iregplus)*(solD - solA1)*conj(solD - solA1) ));
-	//complex normPlusA = sqrt( int2d(ShD)( (region == iregplus)*solD*conj(solD) ));
-	//complex errorH1PlusA = sqrt( int2d(ShD)( (region == iregplus)*( (solD - solA1)*conj(solD - solA1) + (dx(solD) - dx(solA1))*(conj(dx(solD)) - conj(dx(solA1))) + (dy(solD) - dy(solA1))*(conj(dy(solD)) - conj(dy(solA1))) )));
-	//complex errorH1PlusB = sqrt( int2d(ShD)( (region == iregplus)*( (solD - solDA1)*conj(solD - solDA1) + (dx(solD) - dx(solDA1))*(conj(dx(solD)) - conj(dx(solDA1))) + (dy(solD) - dy(solDA1))*(conj(dy(solD)) - conj(dy(solDA1))) )));
-	//complex normDPlusA = sqrt( int2d(ShD)( (region == iregplus)*( (solD)*conj(solD) + (dx(solD))*(conj(dx(solD))) + (dy(solD))*(conj(dy(solD))) )));
 
 	// Plot pour vérification
 	if (plotsol == 1){
@@ -215,9 +203,8 @@ if(mpirank==0){
 		plot(errdx1,wait = attente, fill = 1, value = 1, cmm = "Erreur dx");
 		plot(errdy1,wait = attente, fill = 1, value = 1, cmm = "Erreur dy");
 	}
-	cout << " etape 5" << endl;
 	// Ecriture des erreurs
-	{ofstream Erreur("Erreurs2/Erreur.dat",append);
+	{ofstream Erreur(PTTF+"Erreurs/Erreur.dat",append);
 		Erreur << "Delta = " << delta << endl;
 		Erreur << "Erreur Plus = " << real(errorPlus) << endl;
 		Erreur << "Norme Plus = " << real(normPlus) << endl;
@@ -225,14 +212,6 @@ if(mpirank==0){
 		Erreur << "Erreur H1Plus = " << real(errorH1Plus) << endl;
 		Erreur << "Erreur Relative Plus = " << real(errorPlus)/real(normPlus) << endl;
 		Erreur << "Erreur Relative H1Plus = " << real(errorH1Plus)/real(normDPlus) << endl;
-		//Erreur << "Erreur PlusA = " << real(errorPlusA) << endl;
-		//Erreur << "Norme PlusA = " << real(normPlusA) << endl;
-		//Erreur << "Norme H1PlusA = " << real(normDPlusA) << endl;
-		//Erreur << "Erreur H1PlusA = " << real(errorH1PlusA) << endl;
-		//Erreur << "Erreur H1PlusB = " << real(errorH1PlusB) << endl;
-		//Erreur << "Erreur Relative PlusA = " << real(errorPlusA)/real(normPlusA) << endl;
-		//Erreur << "Erreur Relative H1PlusA = " << real(errorH1PlusA)/real(normDPlusA) << endl;
-		//Erreur << "Erreur Relative H1PlusB = " << real(errorH1PlusB)/real(normDPlusA) << endl;
 		Erreur << endl;}
 
  }

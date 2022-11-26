@@ -1,7 +1,16 @@
 include "getARGV.idp"
 
 // --------------------------------------------------------------
-// Options a
+// Paths
+// -------------------------------------------------------------
+
+string PTFF = getARGV("-PTFF","/home/c31182/Helmh/Figures/")
+string PTPF = getARGV("-PTPF","/home/c31182/Helmh/Programs/")
+string PTTF = getARGV("-PTTF","/home/c31182/Helmh/TEMP/")
+string PTSF = getARGV("-PTSF","/home/c31182/Helmh/ErreursSauvees/")
+
+// --------------------------------------------------------------
+// Options
 // -------------------------------------------------------------
 
 // Onde incidente // Attention, si on veut changer l'onde incidente, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
@@ -29,7 +38,6 @@ int ordre = getARGV("-ordre",1); // Ordre de précision en delta
 // --------------------------------------------------------------
 // Paramétrage
 // --------------------------------------------------------------
-
 
 // Definition de variables physiques // Attention, si on veut changer les données sur moins ou plus, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
 real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
@@ -65,9 +73,9 @@ for (int i = 0; i < Niter; i++){
 		delta = debutdelta;}
 
 	// Calcul des solutions pour la solution avec couche et la solution sans couche
-	exec("mpiexec -n 4 FreeFem++-mpi /home/c31182/Helmh/Helmh_delta.edp -wg -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + Nptlambda + " -uinc "+ typeuinc +" -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm );
+	exec("mpiexec -n 4 FreeFem++-mpi "+PTPF+"Helmh_delta.edp -wg -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + Nptlambda + " -uinc "+ typeuinc +" -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm );
 	if (ordre == 1){
-		exec("FreeFem++ /home/c31182/Helmh/Helmh_asymptotic.edp -wg -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + Nptlambda + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);}
+		exec("FreeFem++ "+PTPF+"Helmh_asymptotic.edp -wg -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + Nptlambda + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);}
 	if (ordre == 2){
-		exec("FreeFem++ /home/c31182/Helmh/Helmh_asymptotic_ordre2.edp -wg -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + Nptlambda + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);}}
+		exec("FreeFem++ "+PTPF+"Helmh_asymptotic_ordre2.edp -wg -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + Nptlambda + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);}}
 

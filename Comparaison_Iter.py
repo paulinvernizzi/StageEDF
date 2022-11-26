@@ -25,7 +25,7 @@ def comparaison(uinc,typecouche,debutdelta,findelta,Niter,Nptlambda,ordre,k,rmup
 		a = "1"
 		b = "-3*pi/4"
 	if typecouche == 3 :
-		a = "5"	
+		a = "5"
 		b = "+ pi/2"
 	if typecouche == 4 :
 		a = "-5"

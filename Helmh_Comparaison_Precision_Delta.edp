@@ -1,10 +1,17 @@
 include "getARGV.idp";
 
+// --------------------------------------------------------------
+// Paths
+// -------------------------------------------------------------
+
+string PTPF = getARGV("-PTPF","/home/c31182/Helmh/Programs/")
+string PTTF = getARGV("-PTTF","/home/c31182/Helmh/TEMP/")
+
 // Delete the old results and create new directories
-exec("rm -r Resultats");
-exec("rm -r Maillages");
-exec("rm -r Erreurs");
-exec("mkdir Resultats Erreurs Maillages" );
+exec("rm -r "+PTTF+"Resultats");
+exec("rm -r "+PTTF+"Maillages");
+exec("rm -r "+PTTF+"Erreurs");
+exec("mkdir "+PTTF+"Resultats "+PTTF+"Erreurs "+PTTF+"Maillages" );
 
 // --------------------------------------------------------------
 // Options
@@ -27,7 +34,7 @@ int finNptL = getARGV("-finNptL", 120);
 int Niter = getARGV("-Niter", 3);
 
 // --------------------------------------------------------------
-// Paramétrage 
+// Paramétrage
 // --------------------------------------------------------------
 
 
@@ -60,20 +67,19 @@ for (int i = 0; i <= Niter; i++){
 	etape = etape + 1;
 	NptL = debutNptL + (etape/Niter)*(finNptL-debutNptL);
 	// Calcul des solutions
-	//exec("export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/c31182/FreeFem-sources-4.11/plugin/mpi");
-	exec("mpiexec -n 4 FreeFem++-mpi /home/c31182/Helmh/Helmh_delta.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);
+	exec("mpiexec -n 4 FreeFem++-mpi "+PTTF+"Helmh_delta.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm+ " -PTTF " + PATHTOTEMPFOLDER);
 }
 
 etape = -1;
-for (int i = 0; i < Niter; i++){ 
+for (int i = 0; i < Niter; i++){
 	etape = etape + 1;
 	NptLa = debutNptL + (etape/Niter)*(finNptL-debutNptL);
 	NptLp = debutNptL + ((etape + 1)/Niter)*(finNptL-debutNptL);
 
 	// Recupération des maillages et créations des espaces éléments finis associés
-	mesh ShDa = readmesh("Maillages/Delta_delta_" +delta+"_NptL"+ NptLa+".mesh");
-	mesh ShDp = readmesh("Maillages/Delta_delta_" +delta+"_NptL"+ NptLp+".mesh");
-	
+	mesh ShDa = readmesh(PTTF+"Maillages/Delta_delta_" +delta+"_NptL"+ NptLa+".mesh");
+	mesh ShDp = readmesh(PTTF+"Maillages/Delta_delta_" +delta+"_NptL"+ NptLp+".mesh");
+
 	fespace XhDa(ShDa,P2);
 	fespace XhDp(ShDp,P2);
 
@@ -89,25 +95,25 @@ for (int i = 0; i < Niter; i++){
 		plot(ShDa, wait=1,cmm = "ShDa");
 		plot(ShDp, wait=1,cmm = "ShDp");
 	}
-	
+
 	// Lecture des solutions
 	XhDa<complex> solDa;
 	XhDp<complex> solDp;
 	matrix<complex> MMp;
 	matrix<complex> MMdp;
 
-	{ifstream Matrp("Resultats/Matrixp_delta_" +delta+"_NptL"+ NptLp+".dat");
+	{ifstream Matrp(PTTF+"Resultats/Matrixp_delta_" +delta+"_NptL"+ NptLp+".dat");
 	    Matrp>>MMp;}
 
-	{ifstream Matrdp("Resultats/Matrixdp_delta_" +delta+"_NptL"+ NptLp+".dat");
+	{ifstream Matrdp(PTTF+"Resultats/Matrixdp_delta_" +delta+"_NptL"+ NptLp+".dat");
 	    Matrdp>>MMdp;}
 
-	{ifstream SolDa("Resultats/Delta_delta_" +delta+"_NptL"+ NptLa+".dat");
+	{ifstream SolDa(PTTF+"Resultats/Delta_delta_" +delta+"_NptL"+ NptLa+".dat");
 	    SolDa>>solDa[];}
 
-	{ifstream SolDp("Resultats/Delta_delta_" +delta+"_NptL"+ NptLp+".dat");
+	{ifstream SolDp(PTTF+"Resultats/Delta_delta_" +delta+"_NptL"+ NptLp+".dat");
 	    SolDp>>solDp[];}
-	
+
 	// Calcul des erreurs
 	matrix IP = interpolate(XhDp,XhDa);
 	complex[int] MsolDp = MMp*solDp[];
@@ -120,7 +126,7 @@ for (int i = 0; i < Niter; i++){
 	complex[int] Mdiffdp = MMdp*diff1;
 	complex errorPlus = sqrt( Mdiffp'*diff1);
 	complex errorH1Plus = sqrt( Mdiffdp'*diff1);
-	
+
 	// Plot pour vérification
 	if (plotsol == 1){
 		XhDa uplota;
@@ -144,9 +150,9 @@ for (int i = 0; i < Niter; i++){
 		plot(errdx, wait = 1, fill = 1, value = 1,cmm = "errdx");
 		plot(errdy, wait = 1, fill = 1, value = 1, cmm = "errdy");
 	}
-	
+
 	// Ecriture des erreurs
-	{ofstream Erreur("Erreurs/Erreur.dat",append);
+	{ofstream Erreur(PTTF+"Erreurs/Erreur.dat",append);
 		Erreur << "NptLa = " << NptLa << endl;
 		Erreur << "NptLp = " << NptLp << endl;
 		Erreur << "Erreur Plus = " << real(errorPlus) << endl;

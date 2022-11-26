@@ -1,6 +1,12 @@
 include "getARGV.idp";
 
 // --------------------------------------------------------------
+// Paths
+// -------------------------------------------------------------
+
+string PTTF = getARGV("-PTTF","/home/c31182/Helmh/TEMP/")
+
+// --------------------------------------------------------------
 // Options
 // -------------------------------------------------------------
 
@@ -21,7 +27,7 @@ int typecouche = getARGV("-typecouche",0) ; // 0 = bosse gauche, 1 = bosse haut,
 int ecrire = getARGV("-ecrire",0); // Ecrire dans un fichier la solution et sauvegarder le maillage ? 0 = Non, 1 = Oui
 
 // --------------------------------------------------------------
-// Paramétrage 
+// Parameters
 // --------------------------------------------------------------
 
 // definition de variables physiques
@@ -70,7 +76,7 @@ func real fcouche(real t) {return (1. + cos(a*t + b)) * 3./8. + 0.25;};
 func real fpcouche(real t){return -a*sin(a*t + b)*3./8. ;};
 
 // ---------------------------------------------------------------
-// Maillage 
+// Maillage
 // ---------------------------------------------------------------
 
 // Construction du maillage
@@ -111,8 +117,8 @@ fespace Xh2(Mh2,P2);
 fespace Xh(Mh,P2);
 
 if (ecrire == 1){
-savemesh(Mh1,"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLambda+".mesh");
-savemesh(Mh2,"Maillages/Asymp_2_delta_" +delta+"_NptL"+ NptLambda+".mesh");
+savemesh(Mh1,PTTF+"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLambda+".mesh");
+savemesh(Mh2,PTTF+"Maillages/Asymp_2_delta_" +delta+"_NptL"+ NptLambda+".mesh");
 }
 
 // ---------------------------------------------------------------
@@ -148,7 +154,6 @@ varf Cl4(u2,v1) = int1d(Mh2,1)(-(1./( delta*fcouche(theta(P.x,P.y))*(rmuc - rmup
 				+ (1./( delta*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) ))*delta^2*
 					( fcouche(theta(P.x,P.y))*(1 - (rmup + 1.i*imup)/(rmuc + 1.i*imuc))*(dx(u2)*(-N.y) + dy(u2)*(N.x))*(dx(v1)*(-N.y) + dy(v1)*(N.x)) 
 					+ fcouche(theta(P.x,P.y))*k^2*((repsc + 1.i*iepsc)*(rmup + 1.i*imup) - 0.5*(repsp + 1.i*iepsp)*(rmup + 1.i*imup) -  0.5*(repsc + 1.i*iepsc)*(rmuc + 1.i*imuc))*u2*v1 ) );
-
 
 matrix<complex> A11 = Cl1(Xh1,Xh1);
 matrix<complex> A12 = Cl3(Xh1,Xh2);
@@ -225,12 +230,11 @@ plot(uplot1, uplot2,wait = 1,fill = 1,value = 1);}
 // ---------------------------------------------------------------
 {
 	if (ecrire == 1){
-		ofstream Err1("Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
+		ofstream Err1(PTTF+"Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
 			Err1 << sol1[];
 
-		ofstream Err2("Resultats/Asymp2_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
+		ofstream Err2(PTTF+"Resultats/Asymp2_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
 			Err2 << sol2[];
 	}
-cout << delta << endl;
 }
 

@@ -1,10 +1,17 @@
 include "getARGV.idp";
 
+// --------------------------------------------------------------
+// Paths
+// -------------------------------------------------------------
+
+string PTPF = getARGV("-PTPF","/home/c31182/Helmh/Programs/")
+string PTTF = getARGV("-PTTF","/home/c31182/Helmh/TEMP/")
+
 // Delete the old results and create new directories
-exec("rm -r Resultats");
-exec("rm -r Maillages");
-exec("rm -r Erreurs");
-exec("mkdir Resultats Erreurs Maillages" );
+exec("rm -r "+PTTF+"Resultats");
+exec("rm -r "+PTTF+"Maillages");
+exec("rm -r "+PTTF+"Erreurs");
+exec("mkdir "+PTTF+"Resultats "+PTTF+"Erreurs "+PTTF+"Maillages" );
 
 // --------------------------------------------------------------
 // Options
@@ -30,7 +37,7 @@ int finNptL = getARGV("-finNptL", 70);
 int Niter = getARGV("-Niter", 20);
 
 // --------------------------------------------------------------
-// Paramétrage 
+// Parameters
 // --------------------------------------------------------------
 
 // Definition de variables physiques
@@ -63,9 +70,9 @@ for (int i = 0; i <= Niter; i++){
 	NptL = debutNptL + (etape/Niter)*(finNptL-debutNptL);
 	// Calcul des solutions
 	if (ordre == 1){
-		exec("FreeFem++ /home/c31182/Helmh/Helmh_asymptotic.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL+ " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);}
+		exec("FreeFem++ "+PTPF+"Helmh_asymptotic.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL+ " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm+ " -PTTF " + PATHTOTEMPFOLDER);}
 	if (ordre == 2){
-		exec("FreeFem++ /home/c31182/Helmh/Helmh_asymptotic_ordre2.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm);}}
+		exec("FreeFem++ "+PTPF+"Helmh_asymptotic_ordre2.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL + " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm+ " -PTTF " + PATHTOTEMPFOLDER);}}
 
 etape = -1;
 
@@ -75,12 +82,12 @@ for (int i = 0; i < Niter; i++){
 	NptLp = debutNptL + ((etape + 1)/Niter)*(finNptL-debutNptL);
 
 	// Recupération des maillages et créations des espaces éléments finis associés
-	mesh ShA1a = readmesh("Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLa+".mesh");
-	mesh ShA1p = readmesh("Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLp+".mesh");
+	mesh ShA1a = readmesh(PTTF+"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLa+".mesh");
+	mesh ShA1p = readmesh(PTTF+"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLp+".mesh");
 
 	fespace XhA1a(ShA1a,P2);
 	fespace XhA1p(ShA1p,P2);
-	
+
 	// Construction espace elements finis pour fonction regions
 	fespace Ph1(ShA1a,P0);
 	Ph1 reg1 = region;
@@ -91,16 +98,15 @@ for (int i = 0; i < Niter; i++){
 		plot(ShA1a, wait= 1,cmm = "ShA1a");
 		plot(ShA1p, wait= 1,cmm = "ShA1p");
 	}
-	
+
 	// Lecture des solutions
 	XhA1a<complex> solA1a;
 	XhA1p<complex> solA1p;
 
-
-	{ifstream SolA1a("Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLa+".dat");
+	{ifstream SolA1a(PTTF+"Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLa+".dat");
 	    SolA1a>>solA1a[];}
-	
-	{ifstream SolA1p("Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLp+".dat");
+
+	{ifstream SolA1p(PTTF+"Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLp+".dat");
 	    SolA1p>>solA1p[];}
 
 	// Calcul des erreurs
@@ -119,9 +125,9 @@ for (int i = 0; i < Niter; i++){
 		err1 = abs(uplot1a - uplot1p);
 		plot(err1,wait = 1,value = 1, fill = 1);
 	}
-	
+
 	// Ecriture des erreurs
-	{ofstream Erreur("Erreurs/Erreur.dat",append);
+	{ofstream Erreur(PTTF+"Erreur.dat",append);
 		Erreur << "NptLa = " << NptLa << endl;
 		Erreur << "NptLp = " << NptLp << endl;
 		Erreur << "Erreur Plus = " << real(errorPlus) << endl;

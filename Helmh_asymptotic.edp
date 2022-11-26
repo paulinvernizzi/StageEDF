@@ -1,6 +1,12 @@
 include "getARGV.idp";
 
 // --------------------------------------------------------------
+// Paths
+// -------------------------------------------------------------
+
+string PTTF = getARGV("-PTTF","/home/c31182/Helmh/TEMP/")
+
+// --------------------------------------------------------------
 // Options
 // -------------------------------------------------------------
 
@@ -23,7 +29,7 @@ int typecouche = getARGV("-typecouche",0) ; // 0 = bosse gauche, 1 = bosse haut,
 int ecrire = getARGV("-ecrire",1); // Ecrire dans un fichier la solution et sauvegarder le maillage ? 0 = Non, 1 = Oui
 
 // --------------------------------------------------------------
-// Paramétrage 
+// Parameters
 // --------------------------------------------------------------
 
 // definition de variables physiques
@@ -33,7 +39,6 @@ real repsc = getARGV("-re",3.), iepsc = getARGV("-ie",0.); // epsilon couche
 real rmum =  getARGV("-rmum",1.), imum = getARGV("-imum",0.); // mu moins
 real rmup =  getARGV("-rmup",1.), imup = getARGV("-imup",0.); // mu plus
 real rmuc = getARGV("-rm",10.), imuc = getARGV("-im",0.); // mu couche
-
 
 //parametres geometrie et nb d'onde
 real k = getARGV("-k",1.); // nombre d'onde
@@ -70,7 +75,7 @@ if (typecouche == 5){ a = 0; b = 0;} // f constant égal à 1
 func real fcouche(real t) {return (1. + cos(a*t + b)) * 3./8. + 0.25;}
 
 // ---------------------------------------------------------------
-// Maillage 
+// Maillage
 // ---------------------------------------------------------------
 
 // Construction du maillage
@@ -113,8 +118,8 @@ fespace Xh2(Mh2,P2);
 fespace Xh(Mh,P2);
 
 if (ecrire == 1){
-savemesh(Mh1,"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLambda+".mesh");
-savemesh(Mh2,"Maillages/Asymp_2_delta_" +delta+"_NptL"+ NptLambda+".mesh");
+savemesh(Mh1,PTTF+"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLambda+".mesh");
+savemesh(Mh2,PTTF+"Maillages/Asymp_2_delta_" +delta+"_NptL"+ NptLambda+".mesh");
 }
 
 // ---------------------------------------------------------------
@@ -217,10 +222,10 @@ plot(uplot1, uplot2,wait = attente,fill = 1,value = 1);}
 // ---------------------------------------------------------------
 {
 	if (ecrire == 1){
-		ofstream Err1("Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
+		ofstream Err1(PTTF+"Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
 			Err1 << sol1[];
 
-		ofstream Err2("Resultats/Asymp2_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
+		ofstream Err2(PTTF+"Resultats/Asymp2_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
 			Err2 << sol2[];
 	}
 cout << delta << endl;

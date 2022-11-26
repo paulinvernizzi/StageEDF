@@ -6,6 +6,13 @@ include "macro_ddm.idp"
 int[int] myN2O;
 macro MhN2O() myN2O// this tells buildDmesh to keep the local to global correspondance
 func Pk=P2;
+
+// --------------------------------------------------------------
+// Paths
+// -------------------------------------------------------------
+
+string PTTF = getARGV("-PTTF","/home/c31182/Helmh/TEMP/")
+
 // --------------------------------------------------------------
 // Options
 // -------------------------------------------------------------
@@ -32,7 +39,6 @@ int ecrire = getARGV("-ecrire",0); // Ecrire dans un fichier la solution et sauv
 // Paramétrage
 // --------------------------------------------------------------
 
-
 // definition de variables physiques
 real repsm =  getARGV("-repsm",100.), iepsm = getARGV("-iepsm",0.1); // epsilon moins
 real repsp =  getARGV("-repsp",100.), iepsp = getARGV("-iepsp",0.1); // epsilon plus
@@ -58,8 +64,6 @@ real delta = getARGV("-delta",0.03);
 real d1=1., d2=0.; // pour l'onde plane
 real x0=0, y0 = 2.5*lambda; // pour le point source
 
-
-
 // fonction annexe
 real a = 0;
 real b = 0;
@@ -73,10 +77,6 @@ if (typecouche == 5){ a = 0; b = 0;} // f constant égal à 1
 func real fcouche(real t) {return (1. + cos(a*t + b)) * 3./8. + 0.25;};
 
 // ---------------------------------------------------------------
-// Calcul de la solution suivant delta
-// ---------------------------------------------------------------
-
-// ---------------------------------------------------------------
 // Maillage
 // ---------------------------------------------------------------
 
@@ -85,7 +85,7 @@ border Sigmaext(t=0,2*pi){x=Rext*cos(t);y=Rext*sin(t);label=2;}; // Bord exterie
 border limit(t=0,2*pi){x = rmoy*cos(t);y = rmoy*sin(t);label = 4;};
 border cpet(t=0,2*pi){x=rpet*cos(t);y=rpet*sin(t);label=1;}; // Bord cercle intérieur
 border couche(t=0,2*pi){x=(rpet + delta*fcouche(t))*cos(t);y=(rpet + delta * fcouche(t))*sin(t);label=3;}; // Bord de la couche fine
-border cint(t=0,2*pi){x = rint*cos(t); y =rint*sin(t);label= 5;}; // 
+border cint(t=0,2*pi){x = rint*cos(t); y =rint*sin(t);label= 5;}; //
 
 //nombre de partitions
 real Nptlambda = getARGV("-NptL",50);
@@ -102,7 +102,7 @@ mesh Mh = buildmesh(cpet(ppet) +
 		Sigmaext(pext));
 
 if (ecrire == 1){
-if (mpirank==0){ savemesh(Mh,"Maillages/Delta_delta_" +delta+"_NptL"+ Nptlambda+".mesh");}}
+if (mpirank==0){ savemesh(Mh,PTTF+"Maillages/Delta_delta_" +delta+"_NptL"+ Nptlambda+".mesh");}}
 
 // Construction espace elements finis pour fonction regions
 fespace Ph(Mh,P0);
@@ -154,11 +154,11 @@ matrix<complex> MMdp = Mdp(Xh,Xh);
 if(mpirank ==0){
 {
 	if (ecrire == 1){
-		{ofstream Matrp("Resultats/Matrixp_delta_" +delta+"_NptL"+Nptlambda+".dat",append);
+		{ofstream Matrp(PTTF+"Resultats/Matrixp_delta_" +delta+"_NptL"+Nptlambda+".dat",append);
 			Matrp.precision(15);
 			Matrp << MMp;}
-		
-		{ofstream Matrdp("Resultats/Matrixdp_delta_" +delta+"_NptL"+Nptlambda+".dat",append);
+
+		{ofstream Matrdp(PTTF+"Resultats/Matrixdp_delta_" +delta+"_NptL"+Nptlambda+".dat",append);
 			Matrdp.precision(15);
 			Matrdp << MMdp;}}
 }
@@ -167,7 +167,6 @@ if(mpirank ==0){
 createMat(Mh, APETSc, Pk);   // ATTENTION FROM THIS LINE EVERYTHING THAT USE Mh would be local
 fespace Xh(Mh,P2);
 // Construction espace elements finis pour les solutions
-
 
 // ---------------------------------------------------------------
 // Ecriture de la formulation variationnelle asymptotique
@@ -183,11 +182,9 @@ APETSc = Cl(Xh,Xh);
 //set(A,solver=UMFPACK);
 set(APETSc, sparams = "-pc_type lu -ksp_type preonly -pc_factor_mat_solver_type mumps");
 
-
 // ---------------------------------------------------------------
 // Construction du second membre
 // ---------------------------------------------------------------
-
 
 Xh<complex> UI = 0;
 Xh<complex> f = 0;
@@ -216,20 +213,16 @@ f = duincpoint;
 varf impclass(u,v)=int1d(Mh,2)(((1./(rmup + 1.i*imup))*f - 1.i*k*UI)*conj(v));
 complex[int] F = impclass(0,Xh);
 
-
 // ---------------------------------------------------------------
-// Résolution 1
+// Résolution
 // ---------------------------------------------------------------
-
 
 Xh<complex> sol;
 sol[] = APETSc^-1*F;
 
-
 // ---------------------------------------------------------------
 // Affichage
 // ---------------------------------------------------------------
-
 
 fespace XhGlobal(MhGlobal,P2);
 XhGlobal<complex> solGlobal=0.+1i*0.;
@@ -243,13 +236,11 @@ complex[int] petsctmp;
 XhGlobal<complex> solGlobaltmp;
 solGlobaltmp[](subIdx)= sol[];
 
-
 mpiAllReduce(solGlobaltmp[],solGlobal[], mpiCommWorld,mpiSUM);
 }
 
 XhGlobal uplot;
 uplot = real(solGlobal);
-
 
 if(mpirank ==0){
 if (photosave == 1){
@@ -260,16 +251,14 @@ plot(uplot,wait = attente,fill = 1,value = 1);}
 }
 }
 
-
 // ---------------------------------------------------------------
 // Ecriture du resultat
 // ---------------------------------------------------------------
 
-
 if(mpirank ==0){
 {
 	if (ecrire == 1){
-		{ofstream Err("Resultats/Delta_delta_" +delta+"_NptL"+ Nptlambda+".dat", append);
+		{ofstream Err(PTTF+"Resultats/Delta_delta_" +delta+"_NptL"+ Nptlambda+".dat", append);
 			Err.precision(15);
 			Err << solGlobal[];}
 }
