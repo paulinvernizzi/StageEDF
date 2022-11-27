@@ -64,7 +64,7 @@ for (int i = 0; i < Niter; i++){
 	Xh<complex> solEIGEN;
 	//real[int] eigEIGEN(Nev);
 	//real[int] eigSLEPC(Nev);
-	
+
 	{ifstream SolEIG("Resultats3/SolEig_NptL"+ NptL+".dat");
 	    SolEIG>>solEIGEN[];}
 	{ifstream SolSLEPC("Resultats3/SolSLEPC_NptL"+ NptL+".dat");
@@ -74,7 +74,6 @@ for (int i = 0; i < Niter; i++){
 	  //  EigEIG>>eigEIGEN[];}
 	//{ifstream EigSLEPC("Resultats3/SolSLEPC_NptL"+ NptL+".dat");
 	  //  EigSLEPC>>eigSLEPC[];}
-	
 
 	complex normL2 = sqrt(int2d(Mh)(sol*conj(sol)));
 	complex normH1 = sqrt(int2d(Mh)(sol*conj(sol) + dx(sol)*conj(dx(sol)) + dy(sol)*conj(dy(sol)) ));
@@ -82,7 +81,7 @@ for (int i = 0; i < Niter; i++){
 	complex erreurL2EIGEN = sqrt(int2d(Mh)((sol - solEIGEN)*conj(sol - solEIGEN)));
 	complex erreurH1SLEPC = sqrt(int2d(Mh)((sol - solSLEPC)*conj(sol - solSLEPC) + (dx(sol) - dx(solSLEPC))*(conj(dx(sol)) - conj(dx(solSLEPC))) + (dy(sol) - dy(solSLEPC))*(conj(dy(sol)) - conj(dy(solSLEPC)))));
 	complex erreurH1EIGEN = sqrt(int2d(Mh)((sol - solEIGEN)*conj(sol - solEIGEN) + (dx(sol) - dx(solEIGEN))*(conj(dx(sol)) - conj(dx(solEIGEN))) + (dy(sol) - dy(solEIGEN))*(conj(dy(sol)) - conj(dy(solEIGEN)))));
-	
+
 	ofstream Erreur("Resultats3/Erreurs.dat", append);
 			Erreur.precision(15);
 			Erreur << "NptL = "<<NptL<<endl;

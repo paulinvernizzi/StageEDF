@@ -1,8 +1,14 @@
 load "msh3"
 load "PETSc"
 load "medit"
-
 include "getARGV.idp";
+
+// --------------------------------------------------------------
+// Paths
+// -------------------------------------------------------------
+
+string PTTF = getARGV("-PTTF","/home/c31182/Helmh/TEMP/")
+
 // --------------------------------------------------------------
 // Options
 // -------------------------------------------------------------
@@ -26,7 +32,7 @@ int typecouche = getARGV("-typecouche",5) ; // 0 = bosse gauche, 1 = bosse haut,
 int ecrire = getARGV("-ecrire",1); // Ecrire dans un fichier la solution et sauvegarder le maillage ? 0 = Non, 1 = Oui
 
 // --------------------------------------------------------------
-// Paramétrage 
+// Paramétrage
 // --------------------------------------------------------------
 
 // definition de variables physiques
@@ -74,7 +80,7 @@ if (typecouche == 5){ a = 0; b = 0;} // f constant égal à 1
 func real fcouche(real t) {return (1. + cos(a*t + b)) * 3./8. + 0.25;}
 
 // ---------------------------------------------------------------
-// Maillage 
+// Maillage
 // ---------------------------------------------------------------
 
 // Construction du maillage
@@ -120,8 +126,8 @@ fespace Xh(Mh,P2);
 fespace XhB(MhB,P2);
 
 if (ecrire == 1){
-savemesh(Mh1,"Maillages/Asymp_M_1_delta_" +delta+"_NptL"+ NptLambda+".mesh");
-savemesh(Mh2,"Maillages/Asymp_M_2_delta_" +delta+"_NptL"+ NptLambda+".mesh");
+savemesh(Mh1,PTTF+"Maillages/Asymp_M_1_delta_" +delta+"_NptL"+ NptLambda+".mesh");
+savemesh(Mh2,PTTF+"Maillages/Asymp_M_2_delta_" +delta+"_NptL"+ NptLambda+".mesh");
 }
 
 // ---------------------------------------------------------------
@@ -197,7 +203,7 @@ Mat dI(I);
 EPSSolve(dB, dI, values = ev, vectors = eV, sparams = " -eps_nev " + Nev + " -eps_gen_hermitian" + " -eps_type krylovschur" );
 for (int i = 0; i < Nev; i++){
 	D(i,i) = ev(n- (i + 1));
-	eV2(:,i) = I*eV[n - (i + 1)][];	
+	eV2(:,i) = I*eV[n - (i + 1)][];
 }
 cout << ev << endl;
 eVMatr = eV2;
@@ -300,10 +306,10 @@ plot(error1, error2, wait = attente, fill = 1,value = 1,cmm = "error");}
 // ---------------------------------------------------------------
 {
 	if (ecrire == 1){
-		ofstream Err1("Resultats/Asymp1_M_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
+		ofstream Err1(PTTF+"Resultats/Asymp1_M_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
 			Err1 << sol1[];
 
-		ofstream Err2("Resultats/Asymp2_M_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
+		ofstream Err2(PTTF+"Resultats/Asymp2_M_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
 			Err2 << sol2[];
 	}
 cout << delta << endl;

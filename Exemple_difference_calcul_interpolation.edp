@@ -20,7 +20,7 @@ int attente= 1;
 int typecouche = getARGV("-typecouche",0) ; // 0 = bosse gauche, 1 = bosse haut, 2 = bosse haut gauche, 3 = 5 bosses symètrie axe ordonnée, 4 = 5 bosses symétrie axe abscisse
 
 // --------------------------------------------------------------
-// Paramétrage 
+// Paramétrage
 // --------------------------------------------------------------
 
 
@@ -64,7 +64,7 @@ if (typecouche == 5){ a = 0; b = 0;} // f constant égal à 1
 func real fcouche(real t) {return (1. + cos(a*t + b)) * 3./8. + 0.25;};
 
 // ---------------------------------------------------------------
-// Maillage 
+// Maillage
 // ---------------------------------------------------------------
 
 // Construction du maillage
@@ -72,7 +72,7 @@ border Sigmaext(t=0,2*pi){x=Rext*cos(t);y=Rext*sin(t);label=2;}; // Bord exterie
 border limit(t=0,2*pi){x = rmoy*cos(t);y = rmoy*sin(t);label = 4;};
 border cpet(t=0,2*pi){x=rpet*cos(t);y=rpet*sin(t);label=1;}; // Bord cercle intérieur
 border couche(t=0,2*pi){x=(rpet + delta*fcouche(t))*cos(t);y=(rpet + delta * fcouche(t))*sin(t);label=3;}; // Bord de la couche fine
-border cint(t=0,2*pi){x = rint*cos(t); y =rint*sin(t);label= 5;}; // 
+border cint(t=0,2*pi){x = rint*cos(t); y =rint*sin(t);label= 5;}; //
 
 //nombre de partitions
 real NptLa = getARGV("-NptLa",90);

@@ -1,3 +1,11 @@
+// ---------------------------------------------------------------------------------
+// This program compute the error between two asymptotic models (AM) with a close difference of mesh parameters.
+// README files explains precisely which equations are studied.
+// To work it requires the following programs :
+// - Helmh_asymptotic.edp (if you want to test the asymptotic model at order 1)
+// - Helmh_asymptotic_ordre2.edp (if you want to test the asymptotic model at order 2).
+// -----------------------------------------------------------------------------------
+
 include "getARGV.idp";
 
 // --------------------------------------------------------------
@@ -17,48 +25,48 @@ exec("mkdir "+PTTF+"Resultats "+PTTF+"Erreurs "+PTTF+"Maillages" );
 // Options
 // -------------------------------------------------------------
 
-// Onde incidente // Attention, si on veut changer l'onde incidente, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
-int typeuinc = getARGV("-uinc",1) ; // 0 = onde plane, 1 = point source
+// Incident wave
+int typeuinc = getARGV("-uinc",0) ; // 0 = Planar wave, 1 = Source point
 
 // Plot
-int plotmaill = 0; // Plot les maillages ? 0 = Non, 1 = Oui
-int ploterror = 0; // Plot l'erreur ? 0 = Non, 1 = Oui
-int plotsol = 0; // Plot les solutions ? 0 = Non, 1 = Oui
+int plotmaill = 0; // Plot Mesh ? 0 = No, 1 = Yes
+int ploterror = 0; // Plot Error ? 0 = No, 1 = Yes
+int plotsol = 0; // Plot Solutions ? 0 = No, 1 = Yes
 
-// Forme couche
-int typecouche = getARGV("-typecouche",0) ; // 0 = bosse gauche, 1 = bosse haut, 2 = bosse haut gauche, 3 = 5 bosses symètrie axe ordonnée, 4 = 5 bosses symétrie axe abscisse
+// Type of thin layer
+int typecouche = getARGV("-typecouche",3); // Type of the thin layer (0 : cos(t - pi), 1 : cos(t - pi/2), 2 : cos(t - 3pi/4), 3 : cos(5t), 4 : cos(-5t), 5 : 1
 
-// Ordre
-int ordre = getARGV("-ordre",1); // Ordre de précision en delta
+// Order
+int ordre = getARGV("-ordre",1); // Order of the asymptotical model
 
-// Reglage points étudiés
-int debutNptL = getARGV("-debutNptL", 50);
-int finNptL = getARGV("-finNptL", 70);
-int Niter = getARGV("-Niter", 20);
+// Mesh parameters iteration
+int debutNptL = getARGV("-debutNptL", 50); // First mesh parameter
+int finNptL = getARGV("-finNptL", 70); // Last mesh parameter
+int Niter = getARGV("-Niter", 20); // Number of iterations
 
 // --------------------------------------------------------------
-// Parameters
+// Physical Parameters
 // --------------------------------------------------------------
 
-// Definition de variables physiques
-real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
-real repsp =  getARGV("-repsp",1.), iepsp = getARGV("-iepsp",0.); // epsilon plus
-real repsc = getARGV("-re",3.), iepsc = getARGV("-ie",0.); // epsilon couche
-real rmum =  getARGV("-rmum",1.), imum = getARGV("-imum",0.); // mu moins
-real rmup =  getARGV("-rmup",1.), imup = getARGV("-imup",0.); // mu plus
-real rmuc = getARGV("-rm",10.), imuc = getARGV("-im",1.); // mu couche
+// Material physics
+real repsm =  getARGV("-repsm",100.), iepsm = getARGV("-iepsm",0.); // epsilon minus
+real repsp =  getARGV("-repsp",100.), iepsp = getARGV("-iepsp",0.); // epsilon plus
+real repsc = getARGV("-re",99.), iepsc = getARGV("-ie",0.); // epsilon layer
+real rmum =  getARGV("-rmum",0.01), imum = getARGV("-imum",0.); // mu minus
+real rmup =  getARGV("-rmup",0.01), imup = getARGV("-imup",0.); // mu plus
+real rmuc = getARGV("-rm",0.11), imuc = getARGV("-im",0.); // mu layer
 
-// Parametres geometrie et nb d'onde
-real k = getARGV("-k",1.); // nombre d'onde
+// Geometrical parameters and wave number
+real k = getARGV("-k",1.); // wave number
 real lambdap = 2*pi/(abs(k)*sqrt(repsp*rmup));
 real lambdac = 2*pi/(abs(k)*sqrt(repsc*rmuc));
 real lambdam = 2*pi/(abs(k)*sqrt(repsm*rmum));
 real lambda = 2*pi/abs(k);
-real Rext = 2 * lambda; // Rayon du cercle exterieur
-real unit = lambda;  // Unite de mesure
-real rpet = unit; // Rayon du cercle intérieur
-real rmoy = rpet + 0.5*lambda; //Rayon limite pour l'erreur
-real rint = rpet - 0.25*lambdam; //Rayon limite pour l'erreur
+real Rext = 2 * lambda; // Exterior circle radius
+real unit = lambda;  // Measure unit
+real rpet = unit; // Interior circle radius
+real rmoy = rpet + 0.5*lambda; // Limit radius in plus domain for error computing
+real rint = rpet - 0.25*lambdam; // Limit radius in minus domain to adapt mesh
 real delta = getARGV("-delta",0.05);
 
 real NptLa = 1;
@@ -68,7 +76,7 @@ real etape = -1;
 for (int i = 0; i <= Niter; i++){
 	etape = etape + 1;
 	NptL = debutNptL + (etape/Niter)*(finNptL-debutNptL);
-	// Calcul des solutions
+	// Computing solutions
 	if (ordre == 1){
 		exec("FreeFem++ "+PTPF+"Helmh_asymptotic.edp -typecouche "+ typecouche +" -re "+ repsc+" -ie "+ iepsc +" -rm "+ rmuc +" -im "+ imuc + " -delta "+ delta + " -ecrire " + 1 + " -NptL " + NptL+ " -uinc "+ typeuinc + " -k "+ k +" -rmup "+ rmup+" -imup "+ imup+ " -repsp "+ repsp+" -iepsp "+ iepsp+" -rmum "+ rmum+" -imum "+ imum+ " -repsm "+ repsm+" -iepsm "+ iepsm+ " -PTTF " + PATHTOTEMPFOLDER);}
 	if (ordre == 2){
@@ -81,25 +89,23 @@ for (int i = 0; i < Niter; i++){
 	NptLa = debutNptL + (etape/Niter)*(finNptL-debutNptL);
 	NptLp = debutNptL + ((etape + 1)/Niter)*(finNptL-debutNptL);
 
-	// Recupération des maillages et créations des espaces éléments finis associés
+	// Recovery of meshes and creation of associated finite element spaces
 	mesh ShA1a = readmesh(PTTF+"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLa+".mesh");
 	mesh ShA1p = readmesh(PTTF+"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLp+".mesh");
-
 	fespace XhA1a(ShA1a,P2);
 	fespace XhA1p(ShA1p,P2);
-
-	// Construction espace elements finis pour fonction regions
+	// Creation finite element spaces for region functions
 	fespace Ph1(ShA1a,P0);
 	Ph1 reg1 = region;
 	int iregplus = reg1(Rext - 0.000001 , 0);
 
-	// Plot pour vérification
+	// Verification plot
 	if (plotmaill == 1){
 		plot(ShA1a, wait= 1,cmm = "ShA1a");
 		plot(ShA1p, wait= 1,cmm = "ShA1p");
 	}
 
-	// Lecture des solutions
+	// Read solutions
 	XhA1a<complex> solA1a;
 	XhA1p<complex> solA1p;
 
@@ -109,13 +115,13 @@ for (int i = 0; i < Niter; i++){
 	{ifstream SolA1p(PTTF+"Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLp+".dat");
 	    SolA1p>>solA1p[];}
 
-	// Calcul des erreurs
+	// Error computing
 	complex errorH1Plus = sqrt( int2d(ShA1p)( (region == iregplus)*( (solA1a - solA1p)*conj(solA1a - solA1p) + (dx(solA1a) - dx(solA1p))*(conj(dx(solA1a)) - conj(dx(solA1p))) + (dy(solA1a) - dy(solA1p))*(conj(dy(solA1a)) - conj(dy(solA1p))) )));
 	complex errorPlus = sqrt( int2d(ShA1p)( (region == iregplus)*(solA1a - solA1p)*conj(solA1a - solA1p) ));
 	complex normPlus = sqrt( int2d(ShA1p)( (region == iregplus)*solA1p*conj(solA1p)));
 	complex normH1Plus = sqrt( int2d(ShA1p)( (region == iregplus)*( solA1p*conj(solA1p) + dx(solA1p)*conj(dx(solA1p)) + dy(solA1p)*conj(dy(solA1p)) ) ) );
 
-	// Plot pour vérification
+	// Verification plot
 	if (plotsol == 1){
 		XhA1p uplot1a;
 		XhA1p uplot1p;
@@ -126,7 +132,7 @@ for (int i = 0; i < Niter; i++){
 		plot(err1,wait = 1,value = 1, fill = 1);
 	}
 
-	// Ecriture des erreurs
+	// Errors writing
 	{ofstream Erreur(PTTF+"Erreur.dat",append);
 		Erreur << "NptLa = " << NptLa << endl;
 		Erreur << "NptLp = " << NptLp << endl;

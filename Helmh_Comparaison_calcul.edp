@@ -1,5 +1,16 @@
 include "getARGV.idp"
 
+// ---------------------------------------------------------------------------------
+// This program compares the asymptotic model (AM) and the thin layer model (TLM).
+// README files explains precisely which equations are studied.
+// The reason of this file is because one cant launch a PETS-c program with a PETS-c program
+// To work it requires the following programs :
+// - Helmh_Comparaison_comparaison.edp (PETS-c code)
+// - Helmh_delta.edp (PETS-c code)
+// - Helmh_asymptotic.edp (if you want to test the asymptotic model at order 1)
+// - Helmh_asymptotic_ordre2.edp (if you want to test the asymptotic model at order 2).
+// -----------------------------------------------------------------------------------
+
 // --------------------------------------------------------------
 // Paths
 // -------------------------------------------------------------
@@ -13,41 +24,38 @@ string PTSF = getARGV("-PTSF","/home/c31182/Helmh/ErreursSauvees/")
 // Options
 // -------------------------------------------------------------
 
-// Onde incidente // Attention, si on veut changer l'onde incidente, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
+// Incident wave
 int typeuinc = getARGV("-uinc",0) ; // 0 = onde plane, 1 = point source
 
-// Echelle logarithmique
-int loga = getARGV("-log", 1); // 1 = echelle logarithmique, 0 = non
-
 // Plot
-int plotmaill = 0; // Plot les maillages ? 0 = Non, 1 = Oui
-int ploterror = 0; // Plot l'erreur ? 0 = Non, 1 = Oui
-int plotsol = 0; // Plot les solutions ? 0 = Non, 1 = Oui
+int plotmaill = 0; // Plot Mesh ? 0 = No, 1 = Yes
+int ploterror = 0; // Plot Error ? 0 = No, 1 = Yes
+int plotsol = 0; // Plot Solutions ? 0 = No, 1 = Yes
 
-// Nombre d'itération
-int Niter = getARGV("-Niter", 2); // Nombre d'itération sur la boucle en delta
-real debutdelta = getARGV("-debutdelta", 0.3); // Debut des deltas
-real findelta = getARGV("-findelta", 0.02); // Fin des deltas
+// Iterations number
+int Niter = getARGV("-Niter", 2); // Iteration number on deltas (thickness of the thin layer)
+real debutdelta = getARGV("-debutdelta", 0.5); // First delta
+real findelta = getARGV("-findelta", 0.03); // Last delta
 
-// Forme couche
-int typecouche = getARGV("-typecouche",3) ; // 0 = bosse gauche, 1 = bosse haut, 2 = bosse haut gauche, 3 = 5 bosses symètrie axe ordonnée, 4 = 5 bosses symétrie axe abscisse
+// Type of thin layer
+int typecouche = getARGV("-typecouche",3); // Type of the thin layer (0 : cos(t - pi), 1 : cos(t - pi/2), 2 : cos(t - 3pi/4), 3 : cos(5t), 4 : cos(-5t), 5 : 1
 
-// Ordre
-int ordre = getARGV("-ordre",1); // Ordre de précision en delta
+// Order
+int ordre = getARGV("-ordre",1); // Order of the asymptotical model
 
 // --------------------------------------------------------------
-// Paramétrage
+// Physical Parameters
 // --------------------------------------------------------------
 
-// Definition de variables physiques // Attention, si on veut changer les données sur moins ou plus, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
-real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
-real repsp =  getARGV("-repsp",1.), iepsp = getARGV("-iepsp",0.); // epsilon plus
-real repsc = getARGV("-re",3.), iepsc = getARGV("-ie",0.); // epsilon couche
-real rmum =  getARGV("-rmum",1.), imum = getARGV("-imum",0.); // mu moins
-real rmup =  getARGV("-rmup",1.), imup = getARGV("-imup",0.); // mu plus
-real rmuc = getARGV("-rm",10.), imuc = getARGV("-im",0.); // mu couche
+// Material physics
+real repsm =  getARGV("-repsm",100.), iepsm = getARGV("-iepsm",0.); // epsilon minus
+real repsp =  getARGV("-repsp",100.), iepsp = getARGV("-iepsp",0.); // epsilon plus
+real repsc = getARGV("-re",99.), iepsc = getARGV("-ie",0.); // epsilon layer
+real rmum =  getARGV("-rmum",0.01), imum = getARGV("-imum",0.); // mu minus
+real rmup =  getARGV("-rmup",0.01), imup = getARGV("-imup",0.); // mu plus
+real rmuc = getARGV("-rm",0.11), imuc = getARGV("-im",0.); // mu layer
 
-// Parametres geometrie et nb d'onde
+// Geometrical parameters and wave number
 real k = getARGV("-k",1.); // nombre d'onde
 real lambdap = 2*pi/(abs(k)*sqrt(repsp*rmup));
 real lambdac = 2*pi/(abs(k)*sqrt(repsc*rmuc));
@@ -58,17 +66,14 @@ real unit = lambda;  // Unite de mesure
 real rpet = unit; // Rayon du cercle intérieur
 real rmoy = rpet + 0.5*lambda; //Rayon limite pour l'erreur
 real rint = rpet - 0.25*lambdam; //Rayon limite pour l'erreur
-real Nptlambda = getARGV("-NptL",50);
-real delta;
+real Nptlambda = getARGV("-NptL",70);
 
+real delta;
 real etape = -1;
 for (int i = 0; i < Niter; i++){
 	etape = etape + 1;
 	if (Niter > 1){
-		if (loga == 1){
 			delta = debutdelta * (findelta/debutdelta)^(etape/(Niter-1));}
-		else{
-			delta = debutdelta + (etape/(Niter-1))*(findelta-debutdelta);}}
 	else{
 		delta = debutdelta;}
 

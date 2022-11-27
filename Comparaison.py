@@ -7,7 +7,6 @@
 # following the thin layer thickness "delta0".
 # To work it requires the following programs :
 # - Helmh_Comparaison_appel.edp
-# - Helmh_Comparaison_calcul.edp
 # - Helmh_Comparaison_comparaison.edp (PETS-c code)
 # - Helmh_delta.edp (PETS-c code)
 # - Helmh_asymptotic.edp (if you want to test the asymptotic model at order 1)
@@ -43,14 +42,15 @@ ordre = 1 # Asymptotical order in delta of the modelisation
 
 # Physical parameter
 k = 1
-rmup, imup = 0.01,0. # mu in plus domain
-repsp, iepsp = 100.,0.1 # epsilon in plus domain
-rmum, imum = 0.01,0. # mu in minus domain
-repsm, iepsm = 100.,0.1 # epsilon in minus domain
-rmuc, imuc = 0.1,0. # mu in the thin layer
-repsc, iepsc = 100,0.1 # epsilon in the thin layer
+rmup, imup = 1.,0. # mu in plus domain
+repsp, iepsp = 1.,0.1 # epsilon in plus domain
+rmum, imum = 1.,0. # mu in minus domain
+repsm, iepsm = 1.,0.1 # epsilon in minus domain
+rmuc, imuc = 10.,0. # mu in the thin layer
+repsc, iepsc = 3.,0.1 # epsilon in the thin layer
 
-# SAVE AND FIGURE NAME AND PATH#
+# SAVE AND FIGURE NAME AND PATH
+# (Only for the saving name, it does not change anything on the result)
 a = ["1","1","1","5","-5","0"]
 b = ["-pi","-pi/2","-3*pi/4","+ pi/2","+ 0","+ 0"]
 onde = ["an incident plane","a source point"]
@@ -58,16 +58,16 @@ f = "(1 + cos("+a[typecouche]+"t "+b[typecouche]+" )*3/8 + 1/4"
 titre = "L2 and H1 relative error between TLM and AM at order "+str(ordre)+" following delta"
 savename = "O"+str(ordre)+"_T"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_d_"+str(debutdelta)+"_"+str(findelta)+"_NptL_"+str(Nptlambda) + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm)
 
-# LISTS #
-X,Yp,Yhp,Zp,Zhp = [],[],[],[],[]
-Listes = [[],[],[],[],[]]
 
-# COMPARISON #
+## COMPARISON ##
+# Execution of the sub-program
 if creation :
 	os.system("FreeFem++ "+PATHTOPROGRAMFOLDER+"Helmh_Comparaison_appel.edp -Niter "+str(Niter)+" -debutdelta "+str(debutdelta)+" -findelta "+str(findelta)+" -typecouche "+str(typecouche)+" -re "+str(repsc)+" -ie "+str(iepsc)+" -rm "+str(rmuc)+" -im "+str(imuc)+" -NptL "+str(Nptlambda)+ " -ordre "+str(ordre)+" -uinc "+str(uinc) + " -k "+ str(k) + " -rmup "+str(rmup) + " -imup "+str(imup)+ " -repsp "+str(repsp) + " -iepsp "+str(iepsp)+ " -rmum "+str(rmum) + " -imum "+str(imum)+ " -repsm "+str(repsm) + " -iepsm "+str(iepsm) + " -PTPF " + str(PATHTOPROGRAMFOLDER) + " -PTTF " + str(PATHTOTEMPFOLDER))
 	os.system("mv "+PATHTOTEMPFOLDER+"Erreur.dat "+PATHTOSAVEFOLDER+"Erreurs_typecouche_"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_N_"+str(Niter)+"_delta0_"+str(debutdelta)+"_deltan_"+str(findelta)+"_NptL_"+str(Nptlambda)+"_ordre_"+str(ordre)+"_uinc_"+str(uinc)+ "_k_"+ str(k) + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm)+".txt") ## renome le fichier
 
-# GRAPH #
+## GRAPH ##
+# Creation of the graph
+Listes = [[],[],[],[],[]]
 if graph :
 	nom = PATHTOSAVEFOLDER+"Erreurs_typecouche_"+str(typecouche)+"_muc_"+str(rmuc)+"+i"+str(imuc)+"_epsc_"+str(repsc)+"+i"+str(iepsc)+"_N_"+str(Niter)+"_delta0_"+str(debutdelta)+"_deltan_"+str(findelta)+"_NptL_"+str(Nptlambda)+"_ordre_"+str(ordre)+"_uinc_"+str(uinc)+ "_k_"+ str(k)  + "_mup_"+str(rmup)+"+i"+str(imup)+ "_epsp_"+str(repsp)+ "+i"+str(iepsp)+"_mum_"+str(rmum)+"+i"+str(imum)+ "_epsm_"+str(repsm)+ "+i"+str(iepsm)+".txt"
 	Mots = ["Delta","Erreur Plus","Erreur H1Plus","Erreur H1Plus","Erreur Relative Plus","Erreur Relative H1Plus"]

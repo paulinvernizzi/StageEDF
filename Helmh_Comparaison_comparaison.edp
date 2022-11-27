@@ -1,11 +1,14 @@
+// ---------------------------------------------------------------------------------
+// !! PETSc program
+// This program compute the error between the asymptotic model (AM) and the thin layer model (TLM).
+// README files explains precisely which equations are studied.
+// It does not need other programs to run, but it need that solutions are already computed.
+// -----------------------------------------------------------------------------------
+
 load "PETSc-complex"
 include "getARGV.idp"
 load "lapack"
 include "macro_ddm.idp"
-
-int[int] myN2OShD;
-macro ShDlocN2O() myN2OShD// this tells buildDmesh to keep the local to global correspondance
-func Pk=P2;
 
 // --------------------------------------------------------------
 // Paths
@@ -20,74 +23,67 @@ string PTSF = getARGV("-PTSF","/home/c31182/Helmh/ErreursSauvees/")
 // Options
 // -------------------------------------------------------------
 
-// Domaines interessants
-int PlusDomaineOnly = getARGV("-dpo", 0) ; // explicit enough
-
-// Onde incidente // Attention, si on veut changer l'onde incidente, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
-int typeuinc = getARGV("-uinc",0) ; // 0 = onde plane, 1 = point source
-
-// Echelle logarithmique
-int loga = getARGV("-log", 1); // 1 = echelle logarithmique, 0 = non
+// Incident wave
+int typeuinc = getARGV("-uinc",0) ; // 0 = Planar wave, 1 = Source point
 
 // Plot
-int plotmaill = 0; // Plot les maillages ? 0 = Non, 1 = Oui
-int ploterror = 0; // Plot l'erreur ? 0 = Non, 1 = Oui
-int plotsol = 0; // Plot les solutions ? 0 = Non, 1 = Oui
+int plotmaill = 0; // Plot Mesh ? 0 = No, 1 = Yes
+int ploterror = 0; // Plot Error ? 0 = No, 1 = Yes
+int plotsol = 0; // Plot Solutions ? 0 = No, 1 = Yes
 
-// Nombre d'itération
-int Niter = getARGV("-Niter", 2); // Nombre d'itération sur la boucle en delta
-real debutdelta = getARGV("-debutdelta", 0.3); // Debut des deltas
-real findelta = getARGV("-findelta", 0.02); // Fin des deltas
+// Iterations number
+int Niter = getARGV("-Niter", 2); // Iteration number on deltas (thickness of the thin layer)
+real debutdelta = getARGV("-debutdelta", 0.5); // First delta
+real findelta = getARGV("-findelta", 0.03); // Last delta
 
-// Forme couche
-int typecouche = getARGV("-typecouche",3) ; // 0 = bosse gauche, 1 = bosse haut, 2 = bosse haut gauche, 3 = 5 bosses symètrie axe ordonnée, 4 = 5 bosses symétrie axe abscisse
+// Type of thin layer
+int typecouche = getARGV("-typecouche",3); // Type of the thin layer (0 : cos(t - pi), 1 : cos(t - pi/2), 2 : cos(t - 3pi/4), 3 : cos(5t), 4 : cos(-5t), 5 : 1
 
-// Ordre
-int ordre = getARGV("-ordre",1); // Ordre de précision en delta
-
-//Attente
-int attente = 0; // Attendre pour les plots
+// Order
+int ordre = getARGV("-ordre",1); // Order of the asymptotical model
 
 // --------------------------------------------------------------
-// Paramétrage
+// Physical Parameters
 // --------------------------------------------------------------
 
-// Definition de variables physiques // Attention, si on veut changer les données sur moins ou plus, il faut les changer aussi manuellement sur Helmh_asymptotic et Helmh_delta
-real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
-real repsp =  getARGV("-repsp",1.), iepsp = getARGV("-iepsp",0.); // epsilon plus
-real repsc = getARGV("-re",3.), iepsc = getARGV("-ie",0.); // epsilon couche
-real rmum =  getARGV("-rmum",1.), imum = getARGV("-imum",0.); // mu moins
-real rmup =  getARGV("-rmup",1.), imup = getARGV("-imup",0.); // mu plus
-real rmuc = getARGV("-rm",10.), imuc = getARGV("-im",0.); // mu couche
+// Material physics
+real repsm =  getARGV("-repsm",100.), iepsm = getARGV("-iepsm",0.); // epsilon minus
+real repsp =  getARGV("-repsp",100.), iepsp = getARGV("-iepsp",0.); // epsilon plus
+real repsc = getARGV("-re",99.), iepsc = getARGV("-ie",0.); // epsilon layer
+real rmum =  getARGV("-rmum",0.01), imum = getARGV("-imum",0.); // mu minus
+real rmup =  getARGV("-rmup",0.01), imup = getARGV("-imup",0.); // mu plus
+real rmuc = getARGV("-rm",0.11), imuc = getARGV("-im",0.); // mu layer
 
-// Parametres geometrie et nb d'onde
-real k = getARGV("-k",1.); // nombre d'onde
+// Geometrical parameters and wave number
+real k = getARGV("-k",1.); // wave number
 real lambdap = 2*pi/(abs(k)*sqrt(repsp*rmup));
 real lambdac = 2*pi/(abs(k)*sqrt(repsc*rmuc));
 real lambdam = 2*pi/(abs(k)*sqrt(repsm*rmum));
 real lambda = 2*pi/abs(k);
-real Rext = 2 * lambda; // Rayon du cercle exterieur
-real unit = lambda;  // Unite de mesure
-real rpet = unit; // Rayon du cercle intérieur
-real rmoy = rpet + 0.5*lambda; //Rayon limite pour l'erreur
-real rint = rpet - 0.25*lambdam; //Rayon limite pour l'erreur
-real Nptlambda = getARGV("-NptL",80);
-real delta;
+real Rext = 2 * lambda; // Exterior circle radius
+real unit = lambda;  // Measure unit
+real rpet = unit; // Interior circle radius
+real rmoy = rpet + 0.5*lambda; // Limit radius in plus domain for error computing
+real rint = rpet - 0.25*lambdam; // Limit radius in minus domain to adapt mesh
+real Nptlambda = getARGV("-NptL",70);
 
+int[int] myN2OShD;
+macro ShDlocN2O() myN2OShD// this tells buildDmesh to keep the local to global correspondance
+func Pk=P2;
+
+real delta;
 real etape = -1;
 for (int i = 0; i < Niter; i++){
 	etape = etape + 1;
 	if (Niter > 1){
-		if (loga == 1){
 			delta = debutdelta * (findelta/debutdelta)^(etape/(Niter-1));}
-		else{
-			delta = debutdelta + (etape/(Niter-1))*(findelta-debutdelta);}}
 	else{
 		delta = debutdelta;}
-	// Recupération des maillages et créations des espaces éléments finis associés
+
+	// Recovery of meshes and creation of associated finite element spaces
 	mesh ShA1 = readmesh(PTTF+"Maillages/Asymp_1_delta_" +delta+"_NptL"+ Nptlambda+".mesh");
 	mesh ShD = readmesh(PTTF+"Maillages/Delta_delta_" +delta+"_NptL"+ Nptlambda+".mesh");
-
+	// P2 elements are important, otherwise we can't calculate errors with mass matrix and stifness matrix
 	fespace XhA1(ShA1,P2);
 	fespace XhD(ShD,P2);
 	fespace PhD(ShD,P0);
@@ -98,15 +94,15 @@ for (int i = 0; i < Niter; i++){
 	int iregmoy = regD(rmoy - 0.000001 , 0);
 	int iregint = regD(rint + 0.000001,0);
 
-	// Plot pour vérification
+	// Verification plot
 	if (plotmaill == 1){
-		// Construction espace elements finis pour fonction regions
+		// Creation of finite element spaces
 		PhD isD1 = (region == iregplus) + (region == iregmoy) + (region == iregcouche);
 		PhD isD2 = (region == iregmoins);
 		PhD isD3 = (region == iregcouche);
 		PhD isD4 = (region == iregmoy) + (region == iregcouche);
 
-		// Construction maillage séparé
+		// Creation of separated mesh
 		mesh ShD1 = trunc(ShD,abs(isD1));
 		mesh ShD2 = trunc(ShD,abs(isD2));
 		mesh ShD3 = trunc(ShD,abs(isD3));
@@ -119,7 +115,7 @@ for (int i = 0; i < Niter; i++){
 		plot(ShD2,wait = attente,cmm = "ShD2");
 	}
 
-	// Lecture des solutions et de la matrice de massa
+	// Read solutions and mass matrix
 	XhA1<complex> solA1;
 	XhD<complex> solD;
 	matrix<complex> MMp;
@@ -137,14 +133,14 @@ for (int i = 0; i < Niter; i++){
 	{ifstream Matrdp(PTTF+"Resultats/Matrixdp_delta_" +delta+"_NptL"+ Nptlambda+".dat");
 	    Matrdp>>MMdp;}
 
-	// Matrice d'interpolation
+	// Interpolation matrix
 	mesh ShDloc=ShD;
 	buildDmesh(ShDloc);
 
 	fespace XhDloc(ShDloc,P2);
 	 matrix IP1 = interpolate(XhDloc,XhA1,inside = 1);
 
-	// Calcul des erreurs
+	// Calculus of errors
 	Mat<complex> APETSc; //Parallel PETSc matrix
 	createMat(ShDloc, APETSc, Pk);
 	XhD<complex> solDA1;
@@ -167,6 +163,7 @@ for (int i = 0; i < Niter; i++){
 if(mpirank==0){
 
 // Now do the error computation globally. (Should be done in // in a better version as we use // for interpolation....)
+	// Calculus with mass and stiffness matrix
 	complex[int] MsolDp = MMp*solD[];
 	complex normPlus = sqrt( MsolDp'*solD[]);
 	complex[int] MsolDdp = MMdp*solD[];
@@ -177,7 +174,7 @@ if(mpirank==0){
 	complex errorPlus = sqrt( Mdiffp'*diff1);
 	complex errorH1Plus = sqrt( Mdiffdp'*diff1);
 
-	// Plot pour vérification
+	// Verification plot
 	if (plotsol == 1){
 		XhD uplot;
 		XhD uplotdx;
@@ -203,7 +200,7 @@ if(mpirank==0){
 		plot(errdx1,wait = attente, fill = 1, value = 1, cmm = "Erreur dx");
 		plot(errdy1,wait = attente, fill = 1, value = 1, cmm = "Erreur dy");
 	}
-	// Ecriture des erreurs
+	// Errors writing
 	{ofstream Erreur(PTTF+"Erreurs/Erreur.dat",append);
 		Erreur << "Delta = " << delta << endl;
 		Erreur << "Erreur Plus = " << real(errorPlus) << endl;

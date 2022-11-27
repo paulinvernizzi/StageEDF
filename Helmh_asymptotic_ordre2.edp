@@ -1,3 +1,8 @@
+// ---------------------------------------------------------------------------------
+// This program runs the asymptotic model (AM) at order 2.
+// README files explains precisely which equations are studied.
+// -----------------------------------------------------------------------------------
+
 include "getARGV.idp";
 
 // --------------------------------------------------------------
@@ -10,85 +15,84 @@ string PTTF = getARGV("-PTTF","/home/c31182/Helmh/TEMP/")
 // Options
 // -------------------------------------------------------------
 
-// Onde incidente
-int typeuinc = getARGV("-uinc",1) ; // 0 = onde plane, 1 = point source
-
-// Photos save
-int photosave = 0 ; // 1 = on sauvegarde l'image, 0 = non
+// Incident wave
+int typeuinc = getARGV("-uinc",0) ; // 0 = Planar wave, 1 = Source point
 
 // Plot
-int plotmaill = 0; // Plot les maillages ? 0 = Non, 1 = Oui
-int plotsol = 0; // Plot les solutions ? 0 = Non, 1 = Oui
+int plotmaill = 0; // Plot Mesh ? 0 = No, 1 = Yes
+int attente = 0; // Wait for seeing next plot ? 0 = No, 1 = Yes
+int plotsol = 0; // Plot Solutions ? 0 = No, 1 = Yes
 
-// Forme couche
-int typecouche = getARGV("-typecouche",0) ; // 0 = bosse gauche, 1 = bosse haut, 2 = bosse haut gauche, 3 = 5 bosses symètrie axe ordonnée, 4 = 5 bosses symétrie axe abscisse
+// Type of thin layer
+int typecouche = getARGV("-typecouche",3); // Type of the thin layer (0 : cos(t - pi), 1 : cos(t - pi/2), 2 : cos(t - 3pi/4), 3 : cos(5t), 4 : cos(-5t), 5 : 1
 
 // Ecriture
-int ecrire = getARGV("-ecrire",0); // Ecrire dans un fichier la solution et sauvegarder le maillage ? 0 = Non, 1 = Oui
+int ecrire = getARGV("-ecrire",1); // Ecrire dans un fichier la solution et sauvegarder le maillage ? 0 = Non, 1 = Oui
 
 // --------------------------------------------------------------
-// Parameters
+// Physical Parameters
 // --------------------------------------------------------------
 
-// definition de variables physiques
-real repsm =  getARGV("-repsm",1.), iepsm = getARGV("-iepsm",0.); // epsilon moins
-real repsp =  getARGV("-repsp",1.), iepsp = getARGV("-iepsp",0.); // epsilon plus
-real repsc = getARGV("-re",3.), iepsc = getARGV("-ie",0.); // epsilon couche
-real rmum =  getARGV("-rmum",1.), imum = getARGV("-imum",0.); // mu moins
-real rmup =  getARGV("-rmup",1.), imup = getARGV("-imup",0.); // mu plus
-real rmuc = getARGV("-rm",10.), imuc = getARGV("-im",1.); // mu couche
+// Material physics
+real repsm =  getARGV("-repsm",100.), iepsm = getARGV("-iepsm",0.); // epsilon minus
+real repsp =  getARGV("-repsp",100.), iepsp = getARGV("-iepsp",0.); // epsilon plus
+real repsc = getARGV("-re",99.), iepsc = getARGV("-ie",0.); // epsilon layer
+real rmum =  getARGV("-rmum",0.01), imum = getARGV("-imum",0.); // mu minus
+real rmup =  getARGV("-rmup",0.01), imup = getARGV("-imup",0.); // mu plus
+real rmuc = getARGV("-rm",0.11), imuc = getARGV("-im",0.); // mu layer
 
-//parametres geometrie et nb d'onde
-real k = getARGV("-k",1.); // nombre d'onde
+// Geometrical parameters and wave number
+real k = getARGV("-k",1.); // wave number
 real lambdap = 2*pi/(abs(k)*sqrt(repsp*rmup));
 real lambdac = 2*pi/(abs(k)*sqrt(repsc*rmuc));
 real lambdam = 2*pi/(abs(k)*sqrt(repsm*rmum));
 real lambda = 2*pi/abs(k);
-real Rext = 2 * lambda; // Rayon du cercle exterieur
-real unit = lambda;  // Unite de mesure
-real rpet = unit; // Rayon du cercle intérieur
-real rmoy = rpet + 0.5*lambda; //Rayon limite pour l'erreur
-real delta = getARGV("-delta",0.005);
-real epsilon = 0.5;
-real c = 1./rpet ;
+real Rext = 2 * lambda; // Exterior circle radius
+real unit = lambda;  // Measure unit
+real rpet = unit; // Interior circle radius
+real rmoy = rpet + 0.5*lambda; // Limit radius in plus domain for error computing
+real rint = rpet - 0.25*lambdam; // Limit radius in minus domain to adapt mesh (useless for this program)
+real delta = getARGV("-delta",0.05); // Thickness of the thin layer
+real c = 1./rpet ; // curvature of the inner circle
 
 // Onde incidente
 real d1=1., d2=0.; // pour l'onde plane
 real x0=0, y0 = 2.5*lambda; // pour le point source
 
-//nombre de partitions
-real NptLambda = getARGV("-NptL",50);
+// Mesh parameters
+real NptLambda = getARGV("-NptL",70);
 int pext = 2*pi*NptLambda*Rext/lambdap;
 int pmoy = 2*pi*NptLambda*rmoy/lambdap;
 int ppet = 2*pi*NptLambda*rpet/min(lambdap,lambdam);
 
-// fonction annexe
+// Annexe functions
 real a = 0;
 real b = 0;
 func real theta(real px, real py) { if (px == 0) {return ((py > 0)* pi/2. + (py< 0) * -pi/2.);} else {return atan2(py,px);} ;};
-if (typecouche == 0){ a = 1. ; b = -1. * pi ; } // bosse vers la gauche
-if (typecouche == 1){ a = 1. ; b = -1 * pi/2 ; } // bosse vers le haut
-if (typecouche == 2){ a = 1. ; b = -3 * pi/4 ; } // bosse en haut à gauche
-if (typecouche == 3){ a = 5. ; b = pi/2 ; } // 5 bosses symètrie axe ordonnée
-if (typecouche == 4){ a = - 5. ; b = 0;  } // 5 bosses symétrie axe abscisse
-if (typecouche == 5){ a = 0; b = 0;} // f constant égal à 1
-func real fcouche(real t) {return (1. + cos(a*t + b)) * 3./8. + 0.25;};
+// Type of the thin layer (0 : cos(t - pi), 1 : cos(t - pi/2), 2 : cos(t - 3pi/4), 3 : cos(5t), 4 : cos(-5t), 5 : 1
+if (typecouche == 0){ a = 1. ; b = -1. * pi ; }
+if (typecouche == 1){ a = 1. ; b = -1 * pi/2 ; }
+if (typecouche == 2){ a = 1. ; b = -3 * pi/4 ; }
+if (typecouche == 3){ a = 5. ; b = pi/2 ; }
+if (typecouche == 4){ a = - 5. ; b = 0;  }
+if (typecouche == 5){ a = 0; b = 0;}
+func real fcouche(real t) {return (1. + cos(a*t + b)) * 3./8. + 0.25;}
 func real fpcouche(real t){return -a*sin(a*t + b)*3./8. ;};
 
 // ---------------------------------------------------------------
-// Maillage
+// Mesh
 // ---------------------------------------------------------------
 
-// Construction du maillage
-border Sigmaext(t=0,2*pi){x=Rext*cos(t);y=Rext*sin(t);label=2;}; // Bord exterieur
-border limit(t=0,2*pi){x = rmoy*cos(t);y = rmoy*sin(t);label = 4;};
-border cpet(t=0,2*pi){x=rpet*cos(t);y=rpet*sin(t);label=1;}; // Bord cercle intérieur
+// Mesh creation
+border Sigmaext(t=0,2*pi){x=Rext*cos(t);y=Rext*sin(t);label=2;}; // Exterior circle
+border limit(t=0,2*pi){x = rmoy*cos(t);y = rmoy*sin(t);label = 4;}; // Limit of error computation in plus domain
+border cpet(t=0,2*pi){x=rpet*cos(t);y=rpet*sin(t);label=1;}; // Interior circle
 
 mesh Mh = buildmesh(cpet(ppet) +
 		limit(pmoy) +
 		Sigmaext(pext));
 
-// Construction espace elements finis pour fonction regions
+// Finite element space creation for regions functions
 fespace Ph(Mh,P0);
 Ph reg = region;
 int iregmoins = reg(0,0);
@@ -98,33 +102,36 @@ Ph is1 = (region == iregplus) + (region == iregmoy);
 Ph is2 = (region == iregmoins);
 Ph is4 = (region == iregmoy);
 
-// Construction maillage séparé
-mesh Mh1 = trunc(Mh,abs(is1));
-mesh Mh2 = trunc(Mh,abs(is2));
+// Separated mesh creations
+mesh Mh1 = trunc(Mh,abs(is1)); // Plus domain
+mesh Mh2 = trunc(Mh,abs(is2)); // Minus domain
 mesh Mh4 = trunc(Mh,abs(is4));
 
 // Plot
 if (plotmaill == 1){
-plot(Mh, wait=1);
-plot(Mh1,wait = 1);
-plot(Mh4,wait = 1);
-plot(Mh2,wait = 1);
+plot(Mh, wait = attente);
+plot(Mh1,wait = attente);
+plot(Mh4,wait = attente);
+plot(Mh2,wait = attente);
 }
 
-// Construction espace elements finis pour les solutions
+// Finite element spaces
 fespace Xh1(Mh1,P2);
 fespace Xh2(Mh2,P2);
 fespace Xh(Mh,P2);
 
+// Saving mesh in temp folder
 if (ecrire == 1){
 savemesh(Mh1,PTTF+"Maillages/Asymp_1_delta_" +delta+"_NptL"+ NptLambda+".mesh");
 savemesh(Mh2,PTTF+"Maillages/Asymp_2_delta_" +delta+"_NptL"+ NptLambda+".mesh");
 }
 
+
 // ---------------------------------------------------------------
-// Ecriture de la formulation variationnelle asymptotique
+// Weak formulations
 // ---------------------------------------------------------------
 
+// For plus domain
 varf Cl1(u1,v1) = int2d(Mh1)(1./(rmup + 1i*imup)*(dx(u1)*dx(v1)+dy(u1)*dy(v1)))
 		- int2d(Mh1)(k^2*(repsp+1i*iepsp)*(u1*v1))
 		- int1d(Mh1,2)(1i*k*u1*v1)
@@ -138,7 +145,7 @@ varf Cl1(u1,v1) = int2d(Mh1)(1./(rmup + 1i*imup)*(dx(u1)*dx(v1)+dy(u1)*dy(v1)))
 					( (1. - (rmup + 1.i*imup)/(rmuc + 1.i*imuc))*fcouche(theta(P.x,P.y))*(dx(u1)*(-N.y) + dy(u1)*(N.x))*(dx(v1)*(-N.y) + dy(v1)*(N.x))
 					 + fcouche(theta(P.x,P.y))*k^2*((repsc + 1.i*iepsc)*(rmup + 1.i*imup) - 0.5*(repsp + 1.i*iepsp)*(rmup + 1.i*imup) -  0.5*(repsc + 1.i*iepsc)*(rmuc + 1.i*imuc))*u1*v1 ) );
 
-
+// For minus domain
 varf Cl2(u2,v2) = int2d(Mh2)(1./(rmum + 1i*imum)*(dx(u2)*dx(v2)+dy(u2)*dy(v2)))
 		- int2d(Mh2)(k^2*(repsm+1i*iepsm)*(u2*v2))
 		+ int1d(Mh2,1)( (1./( delta*fcouche(theta(P.x,P.y))*(rmuc - rmup + 1.i*(imuc - imup))*(1 - delta*0.5*c*fcouche(theta(P.x,P.y))) ))*u2*v2 );
@@ -161,14 +168,14 @@ matrix<complex> A21 = Cl4(Xh2,Xh1);
 matrix<complex> A22 = Cl2(Xh2,Xh2);
 
 // ---------------------------------------------------------------
-// Construction du second membre
+// Computations of second member
 // ---------------------------------------------------------------
 
 Xh<complex> UI = 0;
 Xh<complex> f = 0;
 
 if (typeuinc==0)
-// Onde incidente onde plane
+// Planar incident wave
 {
 func dscalx = d1*x +d2*y;
 func dscaln = d1*cos(atan2(y,x))+d2*sin(atan2(y,x));
@@ -178,7 +185,7 @@ UI =uinc;
 f = duinc;
 }
 else if (typeuinc==1)
-// Onde incidente point source
+// Source point incident wave
 {
 func XmX0 = sqrt((x-x0)^2+(y-y0)^2);
 func uincpoint = jn(0,k*XmX0)+1.i*yn(0,k*XmX0);
@@ -194,7 +201,7 @@ complex[int] F1 = impclass1(0,Xh1);
 complex[int] F2 = impclass2(0,Xh2);
 
 // ---------------------------------------------------------------
-// Résolution 2
+// Resolution
 // ---------------------------------------------------------------
 
 complex[int] FW = [F1,F2];
@@ -205,11 +212,10 @@ complex[int] F7(A11.n);
 complex[int] F8(A22.n);
 for (int i = 0; i < FW.n; i++) { if (i < A11.n) { F7[i] = S[i] ;} else {F8[i - A11.n] = S[i];}};
 Xh1<complex> sol1 = F7;
-//sol1[]=F6[0:A11.n-1]
 Xh2<complex> sol2 = F8;
 
 // ---------------------------------------------------------------
-// Affichage
+// Plot
 // ---------------------------------------------------------------
 
 Xh1 uplot1;
@@ -218,16 +224,13 @@ Xh2 uplot2;
 uplot1 = real(sol1);
 uplot2 = real(sol2);
 
-if (photosave == 1){
-plot(uplot1,uplot2,wait=1,fill=1, value = 1, ps = "H_L_onde_" + typeuinc + "_delta_" + delta + "_" + (rmup - rmuc) + "_" + (rmum - rmuc) + "_" + (repsp - repsc) + "_" + (repsm - repsc) + "_" + (imup - imuc) + "_" + (imum - imuc) + "_" + (iepsp - iepsc) + "_" + (iepsm - iepsc) );}
-else {
 if (plotsol == 1){
-plot(uplot1, uplot2,wait = 1,fill = 1,value = 1);}
-}
+plot(uplot1, uplot2,wait = attente,fill = 1,value = 1);}
 
 // ---------------------------------------------------------------
-// Ecriture du resultat
+// Results writing
 // ---------------------------------------------------------------
+
 {
 	if (ecrire == 1){
 		ofstream Err1(PTTF+"Resultats/Asymp1_delta_" +delta+"_NptL"+ NptLambda+".dat", append);
@@ -237,4 +240,3 @@ plot(uplot1, uplot2,wait = 1,fill = 1,value = 1);}
 			Err2 << sol2[];
 	}
 }
-
